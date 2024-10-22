@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Assignment 2 - Tech Demo</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+  </style>
+  <style>
+/*
+ * Slightly modified version of the following theme:;
+ * https://github.com/markdowncss/air
+ */
+html {
+  font-size: 12px;
+}
+
+@media print {
+  *:before,
+  *:after {
+    background: transparent !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html {
+    font-size: 14px;
+  }
+  body {
+    padding-left: 4rem;
+    padding-right: 4rem;
+  }
+
+  a,
+  a:visited {
+    text-decoration: underline;
+  }
+
+  a[href]:after {
+    content: " (" attr(href) ")";
+  }
+
+  abbr[title]:after {
+    content: " (" attr(title) ")";
+  }
+
+  a[href^="#"]:after,
+  a[href^="javascript:"]:after {
+    content: "";
+  }
+
+  pre,
+  blockquote {
+    border: 1px solid #999;
+    page-break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  img {
+    page-break-inside: avoid;
+  }
+
+  img {
+    max-width: 100% !important;
+  }
+
+  p,
+  h2,
+  h3 {
+    orphans: 3;
+    widows: 3;
+  }
+
+  h2,
+  h3 {
+    page-break-after: avoid;
+  }
+}
+
+@media screen and (min-width: 32rem) and (max-width: 48rem) {
+  html {
+    font-size: 15px;
+  }
+}
+
+@media screen and (min-width: 48rem) {
+  html {
+    font-size: 16px;
+  }
+}
+
+body {
+  line-height: 1.85;
+  padding-bottom: 2rem;
+}
+
+p,
+.air-p {
+  font-size: 1rem;
+  margin-bottom: 1.3rem;
+}
+
+h1,
+.air-h1,
+h2,
+.air-h2,
+h3,
+.air-h3,
+h4,
+.air-h4 {
+  margin: 1.414rem 0 .5rem;
+  font-weight: inherit;
+  line-height: 1.42;
+}
+
+h1,
+.air-h1 {
+  margin-top: 0;
+  font-size: 3.998rem;
+}
+
+h2,
+.air-h2 {
+  font-size: 2.827rem;
+}
+
+h3,
+.air-h3 {
+  font-size: 1.999rem;
+}
+
+h4,
+.air-h4 {
+  font-size: 1.414rem;
+}
+
+h5,
+.air-h5 {
+  font-size: 1.121rem;
+}
+
+h6,
+.air-h6 {
+  font-size: .88rem;
+}
+
+small,
+.air-small {
+  font-size: .707em;
+}
+
+/* https://github.com/mrmrs/fluidity */
+
+img,
+canvas,
+iframe,
+video,
+svg,
+select,
+textarea {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+
+  max-width: 100%;
+}
+
+figcaption {
+  text-align: center;
+}
+.subfigures {
+  text-align: center;
+}
+.subfigures figure {
+  float: left;
+  width: 50%;
+  margin:0;
+  display: inline-block;
+}
+.subfigures img {
+  display: inline-block;
+  width: 90%;
+}
+.subfigures figure figcaption {
+  display: inline-block;
+}
+
+@import url(http://fonts.googleapis.com/css?family=Open+Sans:300italic,300);
+
+body {
+  color: #444;
+  font-family: 'Open Sans', Helvetica, sans-serif;
+  font-weight: 300;
+  margin: 6rem auto 1rem;
+  max-width: 48rem;
+  text-align: justify;
+}
+
+/*img {
+  border-radius: 50%;
+  height: 200px;
+  margin: 0 auto;
+  width: 200px;
+}*/
+
+a,
+a:visited {
+  color: #3498db;
+}
+
+a:hover,
+a:focus,
+a:active {
+  color: #2980b9;
+}
+
+pre:not(.sourceCode) {
+  background-color: #fafafa;
+}
+pre {
+  padding: 1rem;
+  text-align: left;
+}
+
+blockquote {
+  margin: 0;
+  border-left: 5px solid #7a7a7a;
+  font-style: italic;
+  padding: 1.33em;
+  text-align: left;
+}
+
+ul,
+ol,
+li {
+  text-align: left;
+}
+
+p {
+  color: #777;
+}
+
+/*
+ * Copied from w3schools.com:
+ * https://www.w3schools.com/css/css_table.asp
+ *
+ * Table header colour changed to CGV home style (taken from CGV Powerpoint template)
+ */
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+table td, table th {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+table tr:nth-child(even){background-color: #f2f2f2;}
+/* table tr:hover {background-color: #ddd;} */
+table th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  text-align: left;
+  background-color: #10A5D7;
+  color: white;
+}
+
+
+</style>
+  <div style="overflow:auto;">
+  	<p style="float:left;margin:0;"><b>CS4515</b> - 3D Computer Graphics and Animation</p><p style="float:right;margin:0;">Elmar Eisemann, Ricardo Marroqium</p>
+  </div>
+
+  <hr>
+  <br/>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Assignment 2 - Tech Demo</h1>
+</header>
+<p>The goal of Assignment 2 is to create a three-dimensional tech-demo to showcase many Computer Graphics techniques.</p>
+<p>For this second assignment, you should create an original <strong>Tech Demo</strong>. Be creative and think of a scenario where you can nicely showcase different features. The list of features below goes beyond the previous assignments. You might need to refer to the lectures or extra materials. You may use Assignment 1.1 or the weekly exercises as a starting point.</p>
+<p>All implemented features should run in the same application. In other words, you should not create separate applications or demos for different features or different members of the group. Furthermore, every feature should be toggleable from a UI.</p>
+<p>You can view the following videos for some inspiration: https://www.youtube.com/watch?v=jVoV2VysX3M</p>
+<p>You can find most of the demos from the video above at the following link: https://www.nvidia.com/en-us/geforce/community/demos/</p>
+<p>It is advised to work in groups of two or three people. Three is the maximal number. All participants should enroll in a group on Brightspace. The number of the group is not important, a group can pick any free slot.</p>
+<h2 id="minimal-features">Minimal features:</h2>
+<p>Below is a set of minimal features your tech demo should contain</p>
+<ul>
+<li><p>Multiple viewpoints. For example, a top view and a third-person camera that follows a character. The precise position and movement of the camera is up to you</p></li>
+<li><p>Advanced shading: include more complex material models, such as PBR shaders</p></li>
+<li><p>Material textures: e.g., kd, ks, shininess, roughness</p></li>
+<li><p>Normal mapping</p></li>
+<li><p>Environment mapping</p></li>
+<li><p>Smooth paths: at least one feature of your demo should make use of smooth paths using Bézier curves. It can be the movement of a model, a light source, or a camera. Use a path composed of at least three Cubic Bézier curves. You should be able to toggle rendering the curve on/off</p></li>
+<li><p>Hierarchical transformations: include one object with several animated components. This should be done in code, not imported from Blender. Practical examples are a robot arm, snake, solar system, and vehicle composed of multiple parts (but you can think of other options).    </p></li>
+</ul>
+<h2 id="extra-effects">Extra effects</h2>
+<p>You may pick any subset of the features below. Also, feel free to come up with your own extra effects and features. The list below is by far not exhaustive!</p>
+<ul>
+<li><p>Move at constant speed along a Bézier curve</p></li>
+<li><p>Shadows for multiple light sources</p></li>
+<li><p>Shadows from environment maps</p></li>
+<li><p>Particle effects (explosions, magic spells, fire)</p></li>
+<li><p>Procedurally generated terrains, potentially infinite by adding new tiles on the fly</p></li>
+<li><p>Post-processing effects (e.g., glow)</p></li>
+<li><p>Water surfaces that are procedurally generated (produce a vertex grid and move the vertices according to a combination of several sinus functions that you can evaluate in the vertex shader).</p></li>
+<li><p>Animated textures (by switching textures frame to frame). The animation must run at an appropriate framerate (independent of the computer). Flickering colors and other simple rotating effects are not considered.</p></li>
+<li><p>Changing lighting conditions (like a day-night system)</p></li>
+<li><p>A minimap (by rendering from a camera high up in the sky and displaying it on a quad)</p></li>
+<li><p>Collision between the player and objects</p></li>
+<li><p>Procedurally generate a maze or dungeon for the player to move through</p></li>
+<li><p>Generate environment props like procedural buildings</p></li>
+<li><p>Inverse kinematics</p></li>
+<li><p>Linear Blend Skinning in shaders (the weights per vertex may be pre-computed)</p></li>
+<li><p>Blend shapes in shaders</p></li>
+<li><p>SSRT Screen Space Ray Tracing for specular reflections</p></li>
+<li><p>Ambient Occlusion</p></li>
+<li><p>Spatial-temporal reprojection</p></li>
+</ul>
+<p>  You can also enrich your demo by using 3D models and textures from external sources. Make sure you have the correct rights to use the models and that you reference any third-party assets in your report.</p>
+<p>You are judged on the graphics techniques you used and how well they were applied. In short, the artistic aspects of your demo are nice to have but should not be necessary to achieve a high grade. Still, try to be creative and make a demo that you are proud of!</p>
+<h2 id="grading">Grading</h2>
+<p>Assignment 2 counts for 40% of the final grade. The grade for Assignment 2 is divided as follows and capped to a maximum of 10 points for each student.  </p>
+<ul>
+<li>Minimal requirements: max 5 points</li>
+<li>Extra features: additionally necessary to obtain a 10</li>
+</ul>
+<p>Note that the maximal points for each feature are not given beforehand. They will depend on the implementation choices. Poorly implemented features or features that are not well illustrated in the demo/report will not receive full points. Furthermore, you should be able to judge the complexity of each feature using the knowledge you gained so far (i.e., it is part of the assignment). Hence, you should expect fewer points for simple features and more points for complex ones.</p>
+<p>Finally, your code should be readable and properly commented. Otherwise, it might not be possible to properly grade it.</p>
+<h2 id="hand-in-assignment-2">Hand-in Assignment 2</h2>
+<h3 id="submit-to-brightspace">Submit to Brightspace:</h3>
+<ul>
+<li><p>the source code (<strong>do not include build files!</strong>). Remember, all features should be toggleable via the UI.</p></li>
+<li><p>a short report explaining each implemented technique. Each explanation should be accompanied by at least two screenshots (more are welcome) to <strong>clearly</strong> illustrate each method. Do not forget to include references in your report!</p></li>
+<li><p>the first page of your report should include a list of the work done by each individual group member with a percentage indication per feature.</p></li>
+<li><p>a video of your tech demo showcasing all implemented features. We recommend talking over your demo to explain the features. Please keep the video to a maximum of 5 minutes.</p></li>
+</ul>
+<p>Only one submission per group. The group can pick any available group slot to enroll.</p>
+<p>In case of strong discrepancies in the group, we will opt for an individual grading based on the provided overview.</p>
+<p>Groups may be called after the presentation for clarifications regarding the assignment, which can be part of the assessment.</p>
+<h2 id="important-note-about-code-sharing-and-copying">Important note about code sharing and copying:</h2>
+<p>For Assignment 2, you may reuse implementations of the weekly exercises and Assignment 1.1.  However, these implementations belong to whoever develops the code. Hence, you cannot use the implementation of your teammate in any other assignment or share it with others outside the group.</p>
+<p><strong>You are not allowed to use implementations of Assignments 1.2 and 1.3 in Assignment 2 since they run in parallel. Likewise, no code from Assignment 2 from other teammates may be transported into your individual Assignments 1.2 and 1.3.</strong></p>
+<p><strong>Copying code from any other source is considered fraud. If you use external code and clearly reference it in the report and the code, it is allowed, but you do not receive any points for it.</strong></p>
+</body>
+</html>
