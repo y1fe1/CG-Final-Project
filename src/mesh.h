@@ -1,5 +1,7 @@
 #pragma once
 
+#include "protocol.h"
+
 #include <framework/disable_all_warnings.h>
 #include <framework/mesh.h>
 #include <framework/shader.h>
@@ -45,6 +47,7 @@ public:
 
     // Define new Getter here
     GLuint getVao();
+    GLuint getShadowVao();
 
     // Define new Setter here
     void setUBOMaterial(GLuint newUboMaterial);
@@ -57,9 +60,13 @@ public:
 
     void drawBasic(const Shader& drawingShader);
 
+    void drawShadowMap(const Shader& shadowShader, glm::mat4 lightMVP, GLuint texShadowBuffer, const int SHADOWTEX_WIDTH, const int SHADOWTEX_HEIGHT);
+
 private:
     void moveInto(GPUMesh&&);
     void freeGpuMemory();
+
+    void initializeShadowVAO();
 
 private:
     static constexpr GLuint INVALID = 0xFFFFFFFF;
@@ -70,4 +77,6 @@ private:
     GLuint m_vbo { INVALID };
     GLuint m_vao { INVALID };
     GLuint m_uboMaterial { INVALID };
+
+    GLuint m_shadowVao{ INVALID }; // Create Separate VAO for shadowMapping
 };

@@ -78,7 +78,7 @@ void genUboBufferObj(T& object, GLuint& selUboBuffer) {
 }
 
 
-// Material definitions
+// Predefined Material definitions for testing, retrieved from http://www.it.hiof.no/~borres/j3d/explain/light/p-materials.html
 inline Material brass = { glm::vec3(0.780392f, 0.568627f, 0.113725f), glm::vec3(0.992157f, 0.941176f, 0.807843f), 27.8974f };
 inline Material bronze = { glm::vec3(0.714f, 0.4284f, 0.18144f), glm::vec3(0.393548f, 0.271906f, 0.166721f), 25.6f };
 inline Material polishedBronze = { glm::vec3(0.4f, 0.2368f, 0.1036f), glm::vec3(0.774597f, 0.458561f, 0.200621f), 76.8f };
@@ -87,3 +87,19 @@ inline Material copper = { glm::vec3(0.7038f, 0.27048f, 0.0828f), glm::vec3(0.25
 inline Material polishedCopper = { glm::vec3(0.5508f, 0.2118f, 0.066f), glm::vec3(0.580594f, 0.223257f, 0.0695701f), 51.2f };
 inline Material gold = { glm::vec3(0.75164f, 0.60648f, 0.22648f), glm::vec3(0.628281f, 0.555802f, 0.366065f), 51.2f };
 inline Material polishedGold = { glm::vec3(0.34615f, 0.3143f, 0.0903f), glm::vec3(0.797357f, 0.723991f, 0.208006f), 83.2f };
+
+
+inline const std::unordered_map<std::string, Material*> materials = {
+    { "Brass", &brass },
+    { "Bronze", &bronze },
+    { "Polished Bronze", &polishedBronze },
+    { "Chrome", &chrome },
+    { "Copper", &copper },
+    { "Polished Copper", &polishedCopper },
+    { "Gold", &gold },
+    { "Polished Gold", &polishedGold }
+};
+
+inline std::vector<std::string> materialNames; // To store material names for ComboBox
+inline int selectedMaterialIndex = 0; // Index of the selected material
+

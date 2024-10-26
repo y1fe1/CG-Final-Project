@@ -70,6 +70,32 @@ Application::Application()
     catch (ShaderLoadingException e) {
         std::cerr << e.what() << std::endl;
     }
+
+    // === Create Shadow Texture ===
+    try {
+        glGenTextures(1, &texShadow);
+        glBindTexture(GL_TEXTURE_2D, texShadow);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+
+        // Set behavior for when texture coordinates are outside the [0, 1] range.
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        // Set interpolation for texture sampling (GL_NEAREST for no interpolation).
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        glGenFramebuffers(1, &framebuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texShadow, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    }
+    catch (std::runtime_error e) {
+        std::cerr << e.what() << std::endl;
+    }
 }
 
 void Application::update() {
@@ -88,19 +114,39 @@ void Application::update() {
         glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
 
+        glm::mat4 lightMVP;
+        GLfloat near_plane = 0.5f, far_plane = 30.0f;
+        glm::mat4 mainProjectionMatrix = glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
+        glm::mat4 lightViewMatrix = glm::lookAt(selectedLight->position, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        lightMVP = mainProjectionMatrix * lightViewMatrix;
+
         const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
         const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(m_modelMatrix));
 
         for (GPUMesh& mesh : m_meshes) {
+            //shadow maps generates the shadows
+#pragma region shadow Map Genereates
+            if (shadowSettings.shadowEnabled)
+            {
+                mesh.drawShadowMap(m_shadowShader, lightMVP, framebuffer, SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
+            }
+#pragma endregion
 
             // set new Material every time it is updated
             GLuint newUBOMaterial;
             genUboBufferObj(m_Material, newUBOMaterial);
             mesh.setUBOMaterial(newUBOMaterial);
 
+            // genereate ShadowSetting UBO
+            GLuint shadowSettingUbo;
+            genUboBufferObj(shadowSettings, shadowSettingUbo);
+
             m_defaultShader.bind();
             glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
             glUniformMatrix3fv(m_defaultShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
+
+            glUniformMatrix4fv(m_defaultShader.getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
+            glUniform3fv(m_defaultShader.getUniformLocation("viewPos"), 1, glm::value_ptr(selectedCamera->cameraPos()));
 
             if (mesh.hasTextureCoords()) {
                 m_texture.bind(GL_TEXTURE0);
@@ -113,8 +159,11 @@ void Application::update() {
                 glUniform1i(m_defaultShader.getUniformLocation("useMaterial"), m_useMaterial);
             }
 
+            // pass in shadow Setting as UBO
+            m_defaultShader.bindUniformBlock("shadowSetting", 2, shadowSettingUbo);
+
             genUboBufferObj(selectedLight, lightUBO);
-            mesh.draw(m_defaultShader);
+            mesh.draw(m_defaultShader,lightUBO);
             
             int lightsCnt = static_cast<int>(lights.size());
             glBindVertexArray(mesh.getVao());
@@ -180,13 +229,13 @@ void Application::imgui() {
 
     ImGui::Separator();
     ImGui::Text("Material parameters");
-    ImGui::SliderFloat("Shininess", &m_Material.shininess, 0.0f, 100.f);
 
     ImGui::Separator();
     // Color pickers for Kd and Ks
     ImGui::ColorEdit3("Kd", &m_Material.kd[0]);
     ImGui::ColorEdit3("Ks", &m_Material.ks[0]);
 
+    ImGui::SliderFloat("Shininess", &m_Material.shininess, 0.0f, 100.f);
    /* ImGui::SliderInt("Toon Discretization", &m_Material.toonDiscretize, 1, 10);
     ImGui::SliderFloat("Toon Specular Threshold", &m_Material.toonSpecularThreshold, 0.0f, 1.0f);*/
 
