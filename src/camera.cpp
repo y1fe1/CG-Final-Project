@@ -52,8 +52,25 @@ void Camera::updateInput()
 {
     constexpr float moveSpeed = 0.05f;
     constexpr float lookSpeed = 0.0035f;
-
-    if (m_userInteraction) {
+    
+    //If Use Bezier Curve
+    if (m_useBezier) {
+        if (m_bezierConstantSpeed) {
+            checkChange();
+            if (isChangedPoints) {
+                CalculateArcLengthTable();
+                isChangedPoints = false;
+            }
+            bezierTime += bezierSpeed * bezierTimeStep;
+            m_position = getBezier(FindParameterByArcLength(bezierTime));
+        }
+        else {
+            bezierTime += bezierTimeStep;
+            m_position = getBezier(bezierTime);
+        }
+        if (bezierTime > 1) bezierTime = 0;
+    }
+    else if (m_userInteraction) {
         glm::vec3 localMoveDelta{ 0 };
         const glm::vec3 right = glm::normalize(glm::cross(m_forward, m_up));
         if (m_pWindow->isKeyPressed(GLFW_KEY_A))
@@ -83,4 +100,86 @@ void Camera::updateInput()
     else {
         m_prevCursorPos = m_pWindow->getCursorPos();
     }
+}
+
+
+glm::vec3 Camera::getBezier(float t) {
+
+	float u = 1 - t;
+	float uu = u * u;
+	float uuu = uu * u;
+	float tt = t * t;
+	float ttt = tt * t;
+
+	glm::vec3 point = uuu * P0;
+	point += 3 * uu * t * P1; 
+	point += 3 * u * tt * P2;
+	point += ttt * P3;
+
+    return point;
+}
+
+void Camera::CalculateArcLengthTable() {
+    arcLengthTable.clear();
+    arcLengthTable.push_back(0.0f);
+
+    glm::vec3 prevPoint = P0;
+    float totalLength = 0.0f;
+
+    for (int i = 1; i < bezierConstantSpeedSampleNumber; ++i) {
+        float t = static_cast<float>(i) / (bezierConstantSpeedSampleNumber - 1);
+        glm::vec3 currentPoint = getBezier(t);
+        float segmentLength = glm::length(currentPoint - prevPoint);
+        totalLength += segmentLength;
+        arcLengthTable.push_back(totalLength);
+        prevPoint = currentPoint;
+    }
+
+    // Unify the Length Table
+    for (int i = 0; i < bezierConstantSpeedSampleNumber; ++i) {
+        arcLengthTable[i] /= totalLength;
+    }
+
+    //return arcLengthTable;
+}
+
+// Check if there is any changes for Points, if so, update arcLengthTable
+void Camera::checkChange() {
+    if (P0 != oldP0) {
+        oldP0 = P0;
+        isChangedPoints = true;
+    }
+    if (P1 != oldP1) {
+        oldP1 = P1;
+        isChangedPoints = true;
+    }
+    if (P2 != oldP2) {
+        oldP2 = P2;
+        isChangedPoints = true;
+    }
+    if (P3 != oldP3) {
+        oldP3 = P3;
+        isChangedPoints = true;
+    }
+    if (bezierConstantSpeedSampleNumber != oldBezierConstantSpeedSampleNumber) {
+        oldBezierConstantSpeedSampleNumber = bezierConstantSpeedSampleNumber;
+        isChangedPoints = true;
+    }
+}
+
+float Camera::FindParameterByArcLength(float distance) {
+    int low = 0;
+    int high = arcLengthTable.size() - 1;
+
+    while (low < high) {
+        int mid = (low + high) / 2;
+        if (arcLengthTable[mid] < distance) {
+            low = mid + 1;
+        }
+        else {
+            high = mid;
+        }
+    }
+
+    return static_cast<float>(low) / (arcLengthTable.size() - 1);
 }

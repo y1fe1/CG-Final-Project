@@ -172,6 +172,12 @@ void Application::imgui() {
 
     selectedCamera = &cameras[curCameraIndex];
     ImGui::Text("Selected Camera Index: %d", curCameraIndex);
+    ImGui::Checkbox("Use Bezier", &selectedCamera->m_useBezier);
+    ImGui::Checkbox("Use Constant Speed", &selectedCamera->m_bezierConstantSpeed);
+    ImGui::DragFloat3("P0", &selectedCamera->P0.x);
+    ImGui::DragFloat3("P1", &selectedCamera->P1.x);
+    ImGui::DragFloat3("P2", &selectedCamera->P2.x);
+    ImGui::DragFloat3("P3", &selectedCamera->P3.x);
 
     // Button for clearing Camera
     if (ImGui::Button("Reset Cameras")) {
