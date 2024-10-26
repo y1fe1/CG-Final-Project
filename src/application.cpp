@@ -59,6 +59,13 @@ Application::Application()
         shadowBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "Shaders/shadow_frag.glsl");
         m_shadowShader = shadowBuilder.build();
 
+        // set up light Shader
+        ShaderBuilder lightShaderBuilder;
+        lightShaderBuilder
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/light_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/light_frag.glsl");
+        m_lightShader = lightShaderBuilder.build();
+
     }
     catch (ShaderLoadingException e) {
         std::cerr << e.what() << std::endl;
@@ -78,12 +85,19 @@ void Application::update() {
         glClearDepth(1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
 
         const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
         const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(m_modelMatrix));
 
         for (GPUMesh& mesh : m_meshes) {
+
+            // set new Material every time it is updated
+            GLuint newUBOMaterial;
+            genUboBufferObj(m_Material, newUBOMaterial);
+            mesh.setUBOMaterial(newUBOMaterial);
+
             m_defaultShader.bind();
             glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
             glUniformMatrix3fv(m_defaultShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
@@ -98,15 +112,6 @@ void Application::update() {
                 glUniform1i(m_defaultShader.getUniformLocation("hasTexCoords"), GL_FALSE);
                 glUniform1i(m_defaultShader.getUniformLocation("useMaterial"), m_useMaterial);
             }
-
-            glBindVertexArray(mesh.getVao());
-
-            // We tell OpenGL what each vertex looks like and how they are mapped to the shader using the names
-            // NOTE: Usually this can be stored in the VAO, since the locations would be the same in all shaders by using the layout(location = ...) qualifier in the shaders, however this does not work on apple devices.
-            glVertexAttribPointer(m_defaultShader.getAttributeLocation("position"), 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
-            glVertexAttribPointer(m_defaultShader.getAttributeLocation("normal"), 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
-
-            glViewport(0, 0, WIDTH, HEIGHT);
 
             genUboBufferObj(selectedLight, lightUBO);
             mesh.draw(m_defaultShader);
@@ -134,7 +139,7 @@ void Application::update() {
             }
             glBindVertexArray(0);
 
-            mesh.draw(m_lightShader);
+            mesh.drawBasic(m_lightShader);
         }
 
         m_window.swapBuffers();
@@ -168,6 +173,27 @@ void Application::imgui() {
     selectedCamera = &cameras[curCameraIndex];
     ImGui::Text("Selected Camera Index: %d", curCameraIndex);
 
+    // Button for clearing Camera
+    if (ImGui::Button("Reset Cameras")) {
+        //resetObjList(cameras,defaultLight);
+    }
+
+    ImGui::Separator();
+    ImGui::Text("Material parameters");
+    ImGui::SliderFloat("Shininess", &m_Material.shininess, 0.0f, 100.f);
+
+    ImGui::Separator();
+    // Color pickers for Kd and Ks
+    ImGui::ColorEdit3("Kd", &m_Material.kd[0]);
+    ImGui::ColorEdit3("Ks", &m_Material.ks[0]);
+
+   /* ImGui::SliderInt("Toon Discretization", &m_Material.toonDiscretize, 1, 10);
+    ImGui::SliderFloat("Toon Specular Threshold", &m_Material.toonSpecularThreshold, 0.0f, 1.0f);*/
+
+    ImGui::Separator();
+    ImGui::Text("Shadow modes");
+    ImGui::Checkbox("Shadow Enabled", &shadowSettings.shadowEnabled);
+    ImGui::Checkbox("PCF Enabled", &shadowSettings.pcfEnabled);
 
     ImGui::Separator();
     ImGui::Text("Lights");

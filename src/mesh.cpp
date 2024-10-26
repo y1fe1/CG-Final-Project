@@ -20,6 +20,7 @@ GPUMesh::GPUMesh(const Mesh& cpuMesh)
     glGenBuffers(1, &m_uboMaterial);
     glBindBuffer(GL_UNIFORM_BUFFER, m_uboMaterial);
     glBufferData(GL_UNIFORM_BUFFER, sizeof(GPUMaterial), &gpuMaterial, GL_STATIC_READ);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
     // Figure out if this mesh has texture coordinates
     m_hasTextureCoords = static_cast<bool>(cpuMesh.material.kdTexture);
@@ -95,6 +96,11 @@ GLuint GPUMesh::getVao(){
     return m_vao;
 }
 
+void GPUMesh::setUBOMaterial(GLuint newUboMaterial)
+{
+    this->m_uboMaterial = std::move(newUboMaterial);
+}
+
 
 
 void GPUMesh::draw(const Shader& drawingShader)
@@ -115,6 +121,14 @@ void GPUMesh::draw(const Shader& drawingShader, GLuint drawingUBO)
     drawingShader.bindUniformBlock("Material", 0, m_uboMaterial);
     drawingShader.bindUniformBlock("Light", 1, drawingUBO);
 
+    // Draw the mesh's triangles
+    glBindVertexArray(m_vao);
+    glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(0);
+}
+
+void GPUMesh::drawBasic(const Shader& drawingShader)
+{
     // Draw the mesh's triangles
     glBindVertexArray(m_vao);
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);

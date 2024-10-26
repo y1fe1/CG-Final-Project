@@ -43,12 +43,19 @@ public:
 
     bool hasTextureCoords() const;
 
+    // Define new Getter here
     GLuint getVao();
+
+    // Define new Setter here
+    void setUBOMaterial(GLuint newUboMaterial);
+
 
     // Bind VAO and call glDrawElements.
     void draw(const Shader& drawingShader);
 
     void draw(const Shader& drawingShader, GLuint drawingUBO);
+
+    void drawBasic(const Shader& drawingShader);
 
 private:
     void moveInto(GPUMesh&&);

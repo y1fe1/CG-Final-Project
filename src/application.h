@@ -1,8 +1,6 @@
 #pragma once
 
 #include "protocol.h"
-#include "camera.h"
-#include "protocol.h"
 
 class Application {
 private:
