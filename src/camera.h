@@ -21,12 +21,30 @@ public:
 
     glm::vec3 cameraPos() const;
     glm::mat4 viewMatrix() const;
+    bool m_useBezier{ false };
+    bool m_bezierConstantSpeed{ false };
+
+    //Bezier params
+    glm::vec3 P0 = { 1.0f, 0.0f, 0.0f };
+    glm::vec3 P1 = { 0.0f, 1.0f, 1.0f };
+    glm::vec3 P2 = { 1.0f, 1.0f, 0.5f };
+    glm::vec3 P3 = { 0.0f, 0.0f, 0.0f };
+    
+
+    float bezierTimeStep = 0.001;
+    int bezierConstantSpeedSampleNumber = 1000;
+    int bezierSpeed = 1;
 
 private:
     void rotateX(float angle);
     void rotateY(float angle);
+    float bezierTime = 0;
 
 private:
+    glm::vec3 getBezier(float t);
+    void CalculateArcLengthTable();
+    float FindParameterByArcLength(float distance);
+
     static constexpr glm::vec3 s_yAxis{ 0, 1, 0 };
     glm::vec3 m_position{ 0 };
     glm::vec3 m_forward{ 0, 0, -1 };
@@ -34,7 +52,19 @@ private:
 
     const Window* m_pWindow;
     bool m_userInteraction{ true };
+
     glm::dvec2 m_prevCursorPos{ 0 };
+
+    //Constant params
+    glm::vec3 oldP0 = { 1.0f, 0.0f, 0.0f };
+    glm::vec3 oldP1 = { 0.0f, 1.0f, 1.0f };
+    glm::vec3 oldP2 = { 1.0f, 1.0f, 0.5f };
+    glm::vec3 oldP3 = { 0.0f, 0.0f, 0.0f };
+    int oldBezierConstantSpeedSampleNumber = 1000;
+    bool isChangedPoints = { true };
+    void checkChange();
+    std::vector<float> arcLengthTable;
+
 };
 
 
