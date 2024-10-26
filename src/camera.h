@@ -1,4 +1,6 @@
-// Suppress warnings in third-party code.
+// Suppress warnings in third-party code
+#pragma once
+
 #include <framework/disable_all_warnings.h>
 DISABLE_WARNINGS_PUSH()
 #include <glm/mat4x4.hpp>

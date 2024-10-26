@@ -16,7 +16,17 @@ Application::Application()
     //Camera defaultCamera = Camera(&m_window);
 
     // lights must be initialized here since light is still struct not class
-    lights.push_back({glm::vec3(0, 0, 3), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, std::nullopt} );
+    lights.push_back(
+        { glm::vec3(0, 0, 3), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
+    );
+
+    lights.push_back(
+        { glm::vec3(0, 0, 2), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
+    );
+
+    m_Material.ks = glm::vec3{ 0.5f, 0.5f, 1.0f };
+    m_Material.kd = glm::vec3{ 0.1, 1.0, 0.1 };
+
 
     selectedCamera = &cameras.at(curCameraIndex);
     selectedLight = &lights.at(curLightIndex);
@@ -65,6 +75,7 @@ void Application::update() {
         m_viewMatrix = selectedCamera->viewMatrix();
 
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+        glClearDepth(1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glEnable(GL_DEPTH_TEST);
@@ -88,7 +99,42 @@ void Application::update() {
                 glUniform1i(m_defaultShader.getUniformLocation("useMaterial"), m_useMaterial);
             }
 
+            glBindVertexArray(mesh.getVao());
+
+            // We tell OpenGL what each vertex looks like and how they are mapped to the shader using the names
+            // NOTE: Usually this can be stored in the VAO, since the locations would be the same in all shaders by using the layout(location = ...) qualifier in the shaders, however this does not work on apple devices.
+            glVertexAttribPointer(m_defaultShader.getAttributeLocation("position"), 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
+            glVertexAttribPointer(m_defaultShader.getAttributeLocation("normal"), 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+
+            glViewport(0, 0, WIDTH, HEIGHT);
+
+            genUboBufferObj(selectedLight, lightUBO);
             mesh.draw(m_defaultShader);
+            
+            int lightsCnt = static_cast<int>(lights.size());
+            glBindVertexArray(mesh.getVao());
+            m_lightShader.bind();
+            {
+                const glm::vec4 screenPos = mvpMatrix * glm::vec4(selectedLight->position, 1.0f);
+                const glm::vec3 color = selectedLight->color;
+
+                glPointSize(40.0f);
+                glUniform4fv(m_lightShader.getUniformLocation("pos"), 1, glm::value_ptr(screenPos));
+                glUniform3fv(m_lightShader.getUniformLocation("color"), 1, glm::value_ptr(color));
+                glDrawArrays(GL_POINTS, 0, 1);
+            }
+
+            for (const Light& light : lights) {
+                const glm::vec4 screenPos = mvpMatrix * glm::vec4(light.position, 1.0f);
+
+                glPointSize(10.0f);
+                glUniform4fv(m_lightShader.getUniformLocation("pos"), 1, glm::value_ptr(screenPos));
+                glUniform3fv(m_lightShader.getUniformLocation("color"), 1, glm::value_ptr(light.color));
+                glDrawArrays(GL_POINTS, 0, 1);
+            }
+            glBindVertexArray(0);
+
+            mesh.draw(m_lightShader);
         }
 
         m_window.swapBuffers();

@@ -78,7 +78,10 @@ std::vector<GPUMesh> GPUMesh::loadMeshGPU(std::filesystem::path filePath, bool n
     // Generate GPU-side meshes for all sub-meshes
     std::vector<Mesh> subMeshes = loadMesh(filePath, normalize);
     std::vector<GPUMesh> gpuMeshes;
-    for (const Mesh& mesh : subMeshes) { gpuMeshes.emplace_back(mesh); }
+
+    for (const Mesh& mesh : subMeshes) { 
+        gpuMeshes.emplace_back(mesh); 
+    }
     
     return gpuMeshes;
 }
@@ -88,15 +91,34 @@ bool GPUMesh::hasTextureCoords() const
     return m_hasTextureCoords;
 }
 
+GLuint GPUMesh::getVao(){
+    return m_vao;
+}
+
+
+
 void GPUMesh::draw(const Shader& drawingShader)
 {
     // Bind material data uniform (we assume that the uniform buffer objects is always called 'Material')
     // Yes, we could define the binding inside the shader itself, but that would break on OpenGL versions below 4.2
     drawingShader.bindUniformBlock("Material", 0, m_uboMaterial);
-    
+
     // Draw the mesh's triangles
     glBindVertexArray(m_vao);
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(0);
+}
+
+void GPUMesh::draw(const Shader& drawingShader, GLuint drawingUBO)
+{
+    // Bind material data uniform
+    drawingShader.bindUniformBlock("Material", 0, m_uboMaterial);
+    drawingShader.bindUniformBlock("Light", 1, drawingUBO);
+
+    // Draw the mesh's triangles
+    glBindVertexArray(m_vao);
+    glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(0);
 }
 
 void GPUMesh::moveInto(GPUMesh&& other)
