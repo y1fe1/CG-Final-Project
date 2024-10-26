@@ -17,6 +17,7 @@ private:
     Shader m_shadowShader;
     Shader m_lightShader;
     Shader m_borderShader;
+    Shader m_pointShader;
 
     std::vector<GPUMesh> m_meshes;
     Material m_Material;
@@ -45,6 +46,7 @@ private:
     //Minimap
     void renderMiniMap();
     void drawMiniMapBorder();
+    void drawCameraPositionOnMinimap(const glm::vec4& cameraPosInMinimap);
     Minimap minimap;
 
 public:

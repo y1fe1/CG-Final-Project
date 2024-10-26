@@ -71,6 +71,11 @@ Application::Application()
         borderShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/border_frag.glsl");
         m_borderShader = borderShader.build();
 
+        ShaderBuilder pointShader;
+        pointShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/border_vert.glsl");
+        pointShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/border_frag.glsl");
+        m_pointShader = pointShader.build();
+
     }
     catch (ShaderLoadingException e) {
         std::cerr << e.what() << std::endl;
@@ -121,7 +126,7 @@ void Application::update() {
             genUboBufferObj(selectedLight, lightUBO);
             mesh.draw(m_defaultShader);
             renderMiniMap();
-            drawMiniMapBorder();
+            
             int lightsCnt = static_cast<int>(lights.size());
             glBindVertexArray(mesh.getVao());
             m_lightShader.bind();
@@ -279,11 +284,10 @@ void Application::onMouseReleased(int button, int mods) {
 
 
 void Application::renderMiniMap() {
-    // 设置小地图的视口
-    glViewport(800, 800, 200, 200); // 调整到屏幕的右上角
+
+    glViewport(800, 800, 200, 200); // Make it to up-right
 
     // 使用小地图的视图矩阵和投影矩阵渲染场景
-
     m_defaultShader.bind();
     const glm::mat4 mvpMatrix = minimap.projectionMatrix() * minimap.viewMatrix() * m_modelMatrix;
     glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
@@ -293,35 +297,42 @@ void Application::renderMiniMap() {
         mesh.draw(m_defaultShader);
     }
 
+    const glm::mat4 minimapVP = minimap.projectionMatrix() * minimap.viewMatrix() * m_modelMatrix;
+    glm::vec4 cameraPosInMinimap = minimapVP * glm::vec4(selectedCamera->cameraPos(), 1.0f);
+    cameraPosInMinimap /= cameraPosInMinimap.w; // 透视除法，得到标准化设备坐标
+    
+    drawCameraPositionOnMinimap(cameraPosInMinimap);
+
     // 恢复主视口
     glViewport(0, 0, 1024, 1024);
+    drawMiniMapBorder();
 }
 
 
 void Application::drawMiniMapBorder() {
-    // 禁用深度测试，以确保矩形框不会被小地图内容覆盖
+    // Disable Depth Test to make sure our Border will not be covered
     glDisable(GL_DEPTH_TEST);
 
-    // 设置线框模式来绘制边框
+    // Use Polygon Mode to draw Map Border
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-    // 定义矩形框的四个角的屏幕坐标
+    // Define Map Border 
     float borderLeft = 800.0f / 1024.0f * 2.0f - 1.0f;
     float borderRight = (800.0f + 200.0f) / 1024.0f * 2.0f - 1.0f;
     float borderBottom = 800.0f / 1024.0f * 2.0f - 1.0f;
     float borderTop = (800.0f + 200.0f) / 1024.0f * 2.0f - 1.0f;
 
-    // 设置矩形框的顶点数据
+    // Set Vertex data
     float borderVertices[] = {
-        borderLeft,  borderBottom, 0.0f,  // 左下角
-        borderRight, borderBottom, 0.0f,  // 右下角
-        borderRight, borderTop,    0.0f,  // 右上角
-        borderLeft,  borderTop,    0.0f   // 左上角
+        borderLeft,  borderBottom, 0.0f,  
+        borderRight, borderBottom, 0.0f,  
+        borderRight, borderTop,    0.0f,  
+        borderLeft,  borderTop,    0.0f   
     };
 
-    // 使用一个简单的着色器来绘制边框
+    // Use Border Shader to set color
     m_borderShader.bind();
-    glUniform3f(m_borderShader.getUniformLocation("color"), 1.0f, 1.0f, 0.0f); // 设置边框颜色为黄色
+    glUniform3f(m_borderShader.getUniformLocation("color"), 1.0f, 1.0f, 0.0f); // Set Color to Yellow
 
     GLuint borderVBO, borderVAO;
     glGenVertexArrays(1, &borderVAO);
@@ -334,16 +345,55 @@ void Application::drawMiniMapBorder() {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    // 绘制矩形边框
+    // Draw rectangle
     glDrawArrays(GL_LINE_LOOP, 0, 4);
 
-    // 清理
+    // Clean
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
     glDeleteBuffers(1, &borderVBO);
     glDeleteVertexArrays(1, &borderVAO);
 
-    // 恢复设置
+    // Reset
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glEnable(GL_DEPTH_TEST);
+}
+
+void Application::drawCameraPositionOnMinimap(const glm::vec4& cameraPosInMinimap) {
+    glDisable(GL_DEPTH_TEST); // Make sure our dot will not be covered
+
+    float x = cameraPosInMinimap.x;
+    float y = cameraPosInMinimap.y;
+
+    // Set position data of our main camera
+    float pointVertices[] = { x, y, 0.0f };
+
+    GLuint pointVAO, pointVBO;
+    glGenVertexArrays(1, &pointVAO);
+    glGenBuffers(1, &pointVBO);
+
+    glBindVertexArray(pointVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, pointVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(pointVertices), pointVertices, GL_STATIC_DRAW);
+
+    // Set VAO
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Use Point Shader
+    m_pointShader.bind();
+    glUniform3f(m_pointShader.getUniformLocation("color"), 1.0f, 0.0f, 0.0f); // Set point to red
+
+    // Draw Dot
+    glPointSize(6.0f);
+    glDrawArrays(GL_POINTS, 0, 1);
+
+    // Clean
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    glDeleteBuffers(1, &pointVBO);
+    glDeleteVertexArrays(1, &pointVAO);
+
     glEnable(GL_DEPTH_TEST);
 }
