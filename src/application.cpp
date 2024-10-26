@@ -66,6 +66,11 @@ Application::Application()
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/light_frag.glsl");
         m_lightShader = lightShaderBuilder.build();
 
+        ShaderBuilder borderShader;
+        borderShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/border_vert.glsl");
+        borderShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/border_frag.glsl");
+        m_borderShader = borderShader.build();
+
     }
     catch (ShaderLoadingException e) {
         std::cerr << e.what() << std::endl;
@@ -115,7 +120,8 @@ void Application::update() {
 
             genUboBufferObj(selectedLight, lightUBO);
             mesh.draw(m_defaultShader);
-            
+            renderMiniMap();
+            drawMiniMapBorder();
             int lightsCnt = static_cast<int>(lights.size());
             glBindVertexArray(mesh.getVao());
             m_lightShader.bind();
@@ -270,3 +276,74 @@ void Application::onMouseReleased(int button, int mods) {
     std::cout << "Released mouse button: " << button << std::endl;
 }
 
+
+
+void Application::renderMiniMap() {
+    // 设置小地图的视口
+    glViewport(800, 800, 200, 200); // 调整到屏幕的右上角
+
+    // 使用小地图的视图矩阵和投影矩阵渲染场景
+
+    m_defaultShader.bind();
+    const glm::mat4 mvpMatrix = minimap.projectionMatrix() * minimap.viewMatrix() * m_modelMatrix;
+    glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+
+    // 渲染小地图内容
+    for (GPUMesh& mesh : m_meshes) {
+        mesh.draw(m_defaultShader);
+    }
+
+    // 恢复主视口
+    glViewport(0, 0, 1024, 1024);
+}
+
+
+void Application::drawMiniMapBorder() {
+    // 禁用深度测试，以确保矩形框不会被小地图内容覆盖
+    glDisable(GL_DEPTH_TEST);
+
+    // 设置线框模式来绘制边框
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    // 定义矩形框的四个角的屏幕坐标
+    float borderLeft = 800.0f / 1024.0f * 2.0f - 1.0f;
+    float borderRight = (800.0f + 200.0f) / 1024.0f * 2.0f - 1.0f;
+    float borderBottom = 800.0f / 1024.0f * 2.0f - 1.0f;
+    float borderTop = (800.0f + 200.0f) / 1024.0f * 2.0f - 1.0f;
+
+    // 设置矩形框的顶点数据
+    float borderVertices[] = {
+        borderLeft,  borderBottom, 0.0f,  // 左下角
+        borderRight, borderBottom, 0.0f,  // 右下角
+        borderRight, borderTop,    0.0f,  // 右上角
+        borderLeft,  borderTop,    0.0f   // 左上角
+    };
+
+    // 使用一个简单的着色器来绘制边框
+    m_borderShader.bind();
+    glUniform3f(m_borderShader.getUniformLocation("color"), 1.0f, 1.0f, 0.0f); // 设置边框颜色为黄色
+
+    GLuint borderVBO, borderVAO;
+    glGenVertexArrays(1, &borderVAO);
+    glGenBuffers(1, &borderVBO);
+    glBindVertexArray(borderVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, borderVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(borderVertices), borderVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // 绘制矩形边框
+    glDrawArrays(GL_LINE_LOOP, 0, 4);
+
+    // 清理
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    glDeleteBuffers(1, &borderVBO);
+    glDeleteVertexArrays(1, &borderVAO);
+
+    // 恢复设置
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glEnable(GL_DEPTH_TEST);
+}

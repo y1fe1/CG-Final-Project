@@ -1,6 +1,7 @@
 #pragma once
 
 #include "protocol.h"
+#include "minimap.h"
 
 class Application {
 private:
@@ -15,6 +16,7 @@ private:
     Shader m_defaultShader;
     Shader m_shadowShader;
     Shader m_lightShader;
+    Shader m_borderShader;
 
     std::vector<GPUMesh> m_meshes;
     Material m_Material;
@@ -39,6 +41,11 @@ private:
     GLuint framebuffer;
     
     void imgui();
+    
+    //Minimap
+    void renderMiniMap();
+    void drawMiniMapBorder();
+    Minimap minimap;
 
 public:
     Application();
@@ -48,4 +55,5 @@ public:
     void onMouseMove(const glm::dvec2& cursorPos);
     void onMouseClicked(int button, int mods);
     void onMouseReleased(int button, int mods);
+
 };

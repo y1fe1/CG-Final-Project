@@ -18,7 +18,7 @@ add_executable(Master_TechDemo
 	"src/camera.h"   
 	"src/main.cpp" 
 	"src/application.h"
- )
+  "src/minimap.cpp" "src/minimap.h")
 
 target_compile_definitions(Master_TechDemo PRIVATE RESOURCE_ROOT="${CMAKE_CURRENT_LIST_DIR}/")
 target_compile_features(Master_TechDemo PRIVATE cxx_std_20)
