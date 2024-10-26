@@ -59,6 +59,11 @@ Application::Application()
         shadowBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "Shaders/shadow_frag.glsl");
         m_shadowShader = shadowBuilder.build();
 
+        ShaderBuilder PbrBuilder;
+        PbrBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/shadow_vert.glsl");
+        PbrBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "Shaders/PBR_Shader_frag.glsl");
+        m_pbrShader = PbrBuilder.build();
+
         // set up light Shader
         ShaderBuilder lightShaderBuilder;
         lightShaderBuilder
@@ -93,7 +98,7 @@ Application::Application()
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     }
-    catch (std::runtime_error e) {
+    catch (shadowLoadingException e) {
         std::cerr << e.what() << std::endl;
     }
 }
@@ -162,7 +167,8 @@ void Application::update() {
             // pass in shadow Setting as UBO
             m_defaultShader.bindUniformBlock("shadowSetting", 2, shadowSettingUbo);
 
-            genUboBufferObj(selectedLight, lightUBO);
+            // genUboBufferObj(lights, lightUBO);       // Pass Multiple Lights for multiple Light Data Shading
+            genUboBufferObj(selectedLight, lightUBO);   // Pass single Light
             mesh.draw(m_defaultShader,lightUBO);
             
             int lightsCnt = static_cast<int>(lights.size());
@@ -228,16 +234,30 @@ void Application::imgui() {
     }
 
     ImGui::Separator();
-    ImGui::Text("Material parameters");
+    ImGui::Combo("Material Setting", &curMaterialIndex, materialModelNames.data(), static_cast<size_t>(MaterialModel::CNT));
 
     ImGui::Separator();
-    // Color pickers for Kd and Ks
-    ImGui::ColorEdit3("Kd", &m_Material.kd[0]);
-    ImGui::ColorEdit3("Ks", &m_Material.ks[0]);
+    ImGui::Text("Material parameters");
 
-    ImGui::SliderFloat("Shininess", &m_Material.shininess, 0.0f, 100.f);
-   /* ImGui::SliderInt("Toon Discretization", &m_Material.toonDiscretize, 1, 10);
-    ImGui::SliderFloat("Toon Specular Threshold", &m_Material.toonSpecularThreshold, 0.0f, 1.0f);*/
+    if (static_cast<MaterialModel>(curMaterialIndex) == MaterialModel::NORMAL) {
+        ImGui::Separator();
+        // Color pickers for Kd and Ks
+        ImGui::ColorEdit3("Kd", &m_Material.kd[0]);
+        ImGui::ColorEdit3("Ks", &m_Material.ks[0]);
+
+        ImGui::SliderFloat("Shininess", &m_Material.shininess, 0.0f, 100.f);
+        /* ImGui::SliderInt("Toon Discretization", &m_Material.toonDiscretize, 1, 10);
+         ImGui::SliderFloat("Toon Specular Threshold", &m_Material.toonSpecularThreshold, 0.0f, 1.0f);*/
+
+    }
+    else if (static_cast<MaterialModel>(curMaterialIndex) == MaterialModel::PBR) {
+        ImGui::Separator();
+        // Color pickers for Kd and Ks
+        ImGui::ColorEdit3("Albedo", &m_PbrMaterial.albedo[0]);
+        ImGui::SliderFloat("Metallic", &m_PbrMaterial.metallic,0.0f,1.0f);
+        ImGui::SliderFloat("Roughness", &m_PbrMaterial.roughness, 0.0f, 1.0f);
+        ImGui::SliderFloat("Ambient Occlusion", &m_PbrMaterial.ao, 0.0f, 1.0f);
+    }
 
     ImGui::Separator();
     ImGui::Text("Shadow modes");

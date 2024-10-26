@@ -13,13 +13,19 @@ private:
     GLuint lightUBO;
 
     Shader m_defaultShader;
+    Shader m_pbrShader;
+
     Shader m_shadowShader;
     Shader m_lightShader;
 
     std::vector<GPUMesh> m_meshes;
-    Material m_Material;
     Texture m_texture;
+
+    Material m_Material;
+    PBRMaterial m_PbrMaterial;
     bool m_useMaterial{ true };
+
+    int curMaterialIndex = 0;
 
     glm::mat4 m_projectionMatrix;
     glm::mat4 m_viewMatrix;

@@ -31,6 +31,10 @@ DISABLE_WARNINGS_POP()
 inline const int WIDTH = 1200;
 inline const int HEIGHT = 800;
 
+struct shadowLoadingException : public std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
 struct shadowSetting {
     bool shadowEnabled = false;
     bool pcfEnabled = false;
@@ -38,6 +42,21 @@ struct shadowSetting {
 
 inline const int MAXLIGHT = 10;
 inline size_t curLightIndex = 0;
+
+struct PBRMaterial {
+    glm::vec3 albedo;
+    float metallic;
+    float roughness;
+    float ao; // Ambiend Occlusion
+};
+
+enum class MaterialModel {
+    NORMAL,
+    PBR,
+    CNT,
+};
+
+inline std::array<const char*, 2> materialModelNames{ "normal","PBR Material" };
 
 struct Light {
 
@@ -48,7 +67,7 @@ struct Light {
     bool is_spotlight;
     bool has_texture;
 
-    //std::optional<Texture> texture;
+    //std::shared_ptr<Texture> texture; light Texture not used yet
 };
 
 inline Light defaultLight = { glm::vec3(0, 0, 3), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/};
