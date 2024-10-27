@@ -48,6 +48,17 @@ struct PBRMaterial {
     float metallic;
     float roughness;
     float ao; // Ambiend Occlusion
+
+    float _UNUSE_PADDING0;
+
+    PBRMaterial(const glm::vec3& _albedo, float _metallic, float _roughness, float _ao): 
+        albedo(_albedo), 
+        metallic(_metallic), 
+        roughness(_roughness), 
+        ao(_ao), 
+        _UNUSE_PADDING0(0.0f) {
+        // padding is set to 0.0f, but it can be ignored since its only purpose is alignment
+    }
 };
 
 enum class MaterialModel {
@@ -59,14 +70,38 @@ enum class MaterialModel {
 inline std::array<const char*, 2> materialModelNames{ "normal","PBR Material" };
 
 struct Light {
-
     glm::vec3 position;
+    float _UNUSE_PADDING0;
+
     glm::vec3 color;
+    float _UNUSE_PADDING1;
+
     glm::vec3 direction;
+    float _UNUSE_PADDING2;
 
     bool is_spotlight;
     bool has_texture;
+    uint8_t _UNUSE_PADDING3[2];
 
+    Light(): 
+        position(glm::vec3(0.0f)), _UNUSE_PADDING0(0.0f),
+
+        color(glm::vec3(1.0f)), _UNUSE_PADDING1(0.0f),
+
+        direction(-glm::vec3(0.0f, 0.0f, 1.0f)), _UNUSE_PADDING2(0.0f),
+
+        is_spotlight(false), has_texture(false),_UNUSE_PADDING3{ 0, 0 } 
+    {}
+
+    Light(glm::vec3 pos, glm::vec3 col, glm::vec3 dir, bool spotlight, bool texture):
+        position(pos), _UNUSE_PADDING0(0.0f),
+
+        color(col), _UNUSE_PADDING1(0.0f),
+
+        direction(dir), _UNUSE_PADDING2(0.0f),
+
+        is_spotlight(spotlight), has_texture(texture),_UNUSE_PADDING3{ 0, 0 } 
+    {}
     //std::shared_ptr<Texture> texture; light Texture not used yet
 };
 
@@ -79,12 +114,18 @@ void resetObjList(std::vector<T>& objects, T& defaultObject) {
     objects.push_back(defaultObject);
 }
 
-
-template <typename T>
-void genUboBufferObj(std::vector<T>& objLists, GLuint& selUboBuffer) {
+template <typename T> 
+void genUboBufferObj(std::vector<T>& objLists, GLuint& selUboBuffer, int maxObjListCnt) {
     glGenBuffers(1, &selUboBuffer);
+    if (selUboBuffer == 0) {
+        // Handle error if buffer generation failed
+        std::cerr << "Error generating UBO" << std::endl;
+        return;
+    }
+
     glBindBuffer(GL_UNIFORM_BUFFER, selUboBuffer);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(T) * objLists.size(), objLists.data(), GL_STATIC_DRAW);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(T) * maxObjListCnt, nullptr, GL_STATIC_DRAW);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(T) * objLists.size(), objLists.data());
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 

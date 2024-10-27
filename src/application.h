@@ -1,9 +1,13 @@
 #pragma once
 
 #include "protocol.h"
+#define MAX_LIGHT_CNT 10
 
 class Application {
 private:
+
+    bool multiLightShadingEnabled = false;
+    bool usePbrShading = false;
 
     int curDiffuseIndex = 0;
     int curSpecularIndex = 0;
@@ -13,7 +17,9 @@ private:
     GLuint lightUBO;
 
     Shader m_defaultShader;
+    Shader m_multiLightShader;
     Shader m_pbrShader;
+    Shader* m_selShader;
 
     Shader m_shadowShader;
     Shader m_lightShader;
@@ -34,7 +40,7 @@ private:
     std::vector<Camera> cameras;
     Camera* selectedCamera;
 
-    std::vector<Light> lights;
+    std::vector<Light> lights{};
     Light* selectedLight;
 
     //Shadow

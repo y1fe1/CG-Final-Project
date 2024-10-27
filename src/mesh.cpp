@@ -123,11 +123,29 @@ void GPUMesh::draw(const Shader& drawingShader)
     glBindVertexArray(0);
 }
 
-void GPUMesh::draw(const Shader& drawingShader, GLuint drawingUBO)
+void GPUMesh::draw(const Shader& drawingShader, GLuint& drawingUBO, bool multiLightShadingEnabled = false)
 {
     // Bind material data uniform
     drawingShader.bindUniformBlock("Material", 0, m_uboMaterial);
-    drawingShader.bindUniformBlock("Light", 1, drawingUBO);
+
+    if (!multiLightShadingEnabled) {
+        drawingShader.bindUniformBlock("Light", 1, drawingUBO);
+    }
+    else {
+        drawingShader.bindUniformBlock("lights", 1, drawingUBO);
+    }
+
+    // Draw the mesh's triangles
+    glBindVertexArray(m_vao);
+    glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(0);
+}
+
+void GPUMesh::drawPBR(const Shader& drawingShader, GLuint& PbrUbo, GLuint& drawingUBO)
+{
+    // Bind material data uniform
+    drawingShader.bindUniformBlock("PBR_Material", 0, PbrUbo);
+    drawingShader.bindUniformBlock("lights", 1, drawingUBO);
 
     // Draw the mesh's triangles
     glBindVertexArray(m_vao);

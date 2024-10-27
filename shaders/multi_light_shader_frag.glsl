@@ -26,15 +26,24 @@ uniform sampler2D texShadow;
 //Light Setting
 struct Light {
     vec3 position;
+    float _UNUSE_PADDING0;
+
     vec3 color;
+    float _UNUSE_PADDING1;
+
     vec3 direction;
+    float _UNUSE_PADDING2;
 
     bool is_spotlight;
     bool has_texture;
+    vec2 _UNUSE_PADDING3;
 };
 
-uniform struct Light LightList[MAX_LIGHT_CNT];
-uniform unsigned int LightCount;
+layout(std140) uniform lights{
+   Light LightList[MAX_LIGHT_CNT];
+};
+
+uniform int LightCount;
 
 uniform mat4 lightMVP;
 
@@ -117,8 +126,10 @@ void main()
     vec2 shadowMapCoord = fragLightCoord.xy;
 
     vec3 Specular = vec3(0.0f);
+
+    vec3 normal = normalize(fragNormal);
     vec3 viewDir = normalize(viewPos - fragPosition);
-    
+
     vec3 ambient = ambientColor;
 
     float shadowFactor = (shadowEnabled)? shadowFactorCal(shadowMapCoord,fragLightDepth) : 0.0f;
@@ -130,11 +141,11 @@ void main()
     }
     else if (useMaterial)   { 
         
-        for (int idx = 0; idx < LightCount, idx++){
+        for (int idx = 0; idx < LightCount; idx++){
 
-            vec3 normal = normalize(fragNormal);
             vec3 lightDir = normalize(LightList[idx].position - fragPosition);
-
+            
+            vec3 halfDir = normalize(lightDir + viewDir);
             float lambert = max(dot(normal,lightDir),0.0);
 
             //lambert factor
@@ -142,14 +153,14 @@ void main()
         
             //basic phong model
             if(lambert > 0.0f) {
-                vec3 reflectDir = reflect(-lightDir, normal);
-                Specular = ks * pow(max(dot(reflectDir, viewDir), 0.0f), shininess);
+                Specular = ks * pow(max(dot(halfDir, normal), 0.0f), shininess);
             }
         
             // Calculate the light attenuation factor based on distance
             float lightAttenuationFactor = getLightAttenuationFactor(lightDir);
 
-            vec3 finalColor = (ambient + diffuse + Specular);
+            //vec3 finalColor = (ambient + diffuse + Specular);
+            vec3 finalColor = (diffuse + Specular);
             fragColor += vec4(finalColor * LightList[idx].color * (1-shadowFactor) * lightAttenuationFactor, 1);
         }
     }

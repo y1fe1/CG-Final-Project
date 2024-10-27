@@ -13,7 +13,6 @@ layout(std140) uniform Material // Must match the GPUMaterial defined in src/mes
 
 // Shadow Setting
 layout(std140) uniform shadowSetting{
-
     bool shadowEnabled;
     bool pcfEnabled;
     bool transparencyEnabled;
@@ -23,12 +22,19 @@ uniform sampler2D texShadow;
 //Light Setting
 layout(std140) uniform Light {
     vec3 position;
+    float _UNUSE_PADDING0;
+
     vec3 color;
+    float _UNUSE_PADDING1;
+
     vec3 direction;
+    float _UNUSE_PADDING2;
 
     bool is_spotlight;
     bool has_texture;
+    vec2 _UNUSE_PADDING3;
 };
+
 uniform mat4 lightMVP;
 
 uniform vec3 viewPos;
@@ -84,6 +90,14 @@ float shadowFactorCal(vec2 shadowMapCoord, float fragLightDepth){
     return shadowFactor;
 }
 
+float getLightAttenuationFactor(vec3 lightDir) {
+    float dist = length(lightDir);
+    float attenuation = 1.0 / (dist * dist); // Simple quadratic falloff
+
+    // Clamp the attenuation to avoid excessively bright values at close distances
+    return clamp(attenuation, 0.0, 1.0);
+}
+
 void main()
 {
 
@@ -102,12 +116,16 @@ void main()
     vec2 shadowMapCoord = fragLightCoord.xy;
 
     vec3 Specular = vec3(0.0f);
+
     vec3 normal = normalize(fragNormal);
-    vec3 lightDir = normalize(position - fragPosition);
     vec3 viewDir = normalize(viewPos - fragPosition);
 
+    vec3 lightDir = normalize(position - fragPosition);
+
+    vec3 halfDir = normalize(lightDir + viewDir);
+
     float lambert = max(dot(normal,lightDir),0.0);
-    vec3 ambient = ambientColor;
+    //vec3 ambient = ambientColor;
 
     float shadowFactor = (shadowEnabled)? shadowFactorCal(shadowMapCoord,fragLightDepth) : 0.0f;
 
@@ -119,17 +137,22 @@ void main()
         //lambert factor
         vec3 diffuse = lambert*kd;
         
-        //basic phong model
+        //basic blinn-phong model
         if(lambert > 0.0f) {
-            vec3 reflectDir = reflect(-lightDir, normal);
-            Specular = ks * pow(max(dot(reflectDir, viewDir), 0.0f), shininess);
+            Specular = ks * pow(max(dot(halfDir, normal), 0.0f), shininess);
         }
         
-        vec3 finalColor = (ambient + diffuse + Specular);
+        // Calculate the light attenuation factor based on distance
+        float lightAttenuationFactor = getLightAttenuationFactor(lightDir);
 
-        fragColor = vec4(finalColor * color * (1-shadowFactor), 1);
+        //vec3 finalColor = (ambient + diffuse + Specular);
+        vec3 finalColor = (diffuse + Specular);
+        //vec3 finalColor = diffuse;
+
+        //fragColor = vec4(finalColor * color * (1-shadowFactor) * lightAttenuationFactor, 1);
+        fragColor = vec4(finalColor * color * lightAttenuationFactor, 1);
     }
-    else                    { fragColor = vec4(normal, 1); } // Output color value, change from (1, 0, 0) to something else
+    else                    { fragColor = vec4(color, 1); } // Output color value, change from (1, 0, 0) to something else
 }
 
 

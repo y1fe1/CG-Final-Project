@@ -1,7 +1,7 @@
 #version 410
 
 #define MAX_LIGHT_CNT 10
-#define PI 3.14159265357
+#define PI 3.1415926535897932384626433832795
 
 // Not Used yet will be combined with the original shader
 // Implementation of PBR Shading
@@ -13,6 +13,8 @@ layout(std140) uniform PBR_Material
     float metallic;
     float roughness;
     float ao; // Ambiend Occlusion
+
+    vec3 _UNUSE_PADDING0;
 };
 
 // Shadow Setting
@@ -27,14 +29,23 @@ uniform sampler2D texShadow;
 //Light Setting
 struct Light {
     vec3 position;
+    float _UNUSE_PADDING0;
+
     vec3 color;
+    float _UNUSE_PADDING1;
+
     vec3 direction;
+    float _UNUSE_PADDING2;
 
     bool is_spotlight;
     bool has_texture;
+    vec2 _UNUSE_PADDING3;
 };
 
-uniform Light LightList[MAX_LIGHT_CNT];
+layout(std140) uniform lights{
+   Light LightList[MAX_LIGHT_CNT];
+};
+
 uniform int LightCount;
 
 uniform mat4 lightMVP;
@@ -167,8 +178,6 @@ void main()
 
     vec3 normal = normalize(fragNormal);
     vec3 viewDir = normalize(viewPos - fragPosition);
-    
-    vec3 ambient = ambientColor;
 
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, albedo, metallic);
@@ -181,17 +190,15 @@ void main()
     }
     else if (useMaterial)   { 
         
-        for (int idx = 0; idx < LightCount; idx++){
+        for (int idx = 0; idx < LightCount; ++idx){
 
             vec3 lightDir = normalize(LightList[idx].position - fragPosition);
-            vec3 halfDir = normalize(lightDir + viewDir);
+            vec3 halfDir = normalize(viewDir + lightDir);
 
             float distance = length(LightList[idx].position - fragPosition);
-
-            float lambert = max(dot(normal,lightDir),0.0);
-
             // Calculate the light attenuation factor based on distance
             float lightAttenuationFactor = getLightAttenuationFactor(lightDir);
+
             vec3 radiance = LightList[idx].color * lightAttenuationFactor;
 
             // Cook Tolerance
@@ -210,6 +217,7 @@ void main()
             float NdotL = max(dot(normal, lightDir), 0.0);                
 
             finalColor += (kD * albedo / PI + specular) * radiance * NdotL;
+            //finalColor += radiance;
         }
 
         vec3 ambient = vec3(0.03) * albedo * ao;

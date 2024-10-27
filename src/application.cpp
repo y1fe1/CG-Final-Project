@@ -11,22 +11,32 @@ Application::Application()
     , cameras{
         { &m_window, glm::vec3(1.2f, 1.1f, 0.9f), -glm::vec3(1.2f, 1.1f, 0.9f) },
         { &m_window, glm::vec3(3.8f, 1.0f, 0.06f), -glm::vec3(1.8f, 1.0f, 0.5f) }
-    }
+    },
+    // init PBR material
+    m_PbrMaterial{ glm::vec3{ 0.8, 0.6, 0.4 }, 1.0f, 0.2f, 1.0f }
 {
     //Camera defaultCamera = Camera(&m_window);
 
     // lights must be initialized here since light is still struct not class
     lights.push_back(
-        { glm::vec3(0, 0, 3), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
+        { glm::vec3(1, 3, -2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
     );
 
-    lights.push_back(
-        { glm::vec3(0, 0, 2), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
-    );
+    //lights.push_back(
+    //    { glm::vec3(0, 0, 2), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
+    //);
 
-    m_Material.ks = glm::vec3{ 0.5f, 0.5f, 1.0f };
-    m_Material.kd = glm::vec3{ 0.1, 1.0, 0.1 };
+    //lights.push_back(
+    //    { glm::vec3(2, 1, 2), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
+    //);
 
+    //lights.push_back(
+    //    { glm::vec3(1,1, 3), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
+    //);
+
+    // init normal material
+    m_Material.kd = glm::vec3{ 0.5f, 0.5f, 1.0f };
+    m_Material.ks = glm::vec3{ 0.1, 1.0, 0.1 };
 
     selectedCamera = &cameras.at(curCameraIndex);
     selectedLight = &lights.at(curLightIndex);
@@ -46,7 +56,7 @@ Application::Application()
             onMouseReleased(button, mods);
         });
 
-    m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/dragon.obj");
+    m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/scene.obj");
 
     try {
         ShaderBuilder defaultBuilder;
@@ -59,8 +69,13 @@ Application::Application()
         shadowBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "Shaders/shadow_frag.glsl");
         m_shadowShader = shadowBuilder.build();
 
+        ShaderBuilder multiLightBuilder;
+        multiLightBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/shader_vert.glsl");
+        multiLightBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "Shaders/multi_light_shader_frag.glsl");
+        m_multiLightShader = multiLightBuilder.build();
+
         ShaderBuilder PbrBuilder;
-        PbrBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/shadow_vert.glsl");
+        PbrBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/shader_vert.glsl");
         PbrBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "Shaders/PBR_Shader_frag.glsl");
         m_pbrShader = PbrBuilder.build();
 
@@ -146,30 +161,71 @@ void Application::update() {
             GLuint shadowSettingUbo;
             genUboBufferObj(shadowSettings, shadowSettingUbo);
 
-            m_defaultShader.bind();
-            glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
-            glUniformMatrix3fv(m_defaultShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
+            if (multiLightShadingEnabled) {
+               
+                GLuint PbrUBO;
+                if (usePbrShading) {
+                    m_selShader = &m_pbrShader;
 
-            glUniformMatrix4fv(m_defaultShader.getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
-            glUniform3fv(m_defaultShader.getUniformLocation("viewPos"), 1, glm::value_ptr(selectedCamera->cameraPos()));
+                }
+                else {
+                    m_selShader = &m_multiLightShader;
+                }
 
-            if (mesh.hasTextureCoords()) {
-                m_texture.bind(GL_TEXTURE0);
-                glUniform1i(m_defaultShader.getUniformLocation("colorMap"), 0);
-                glUniform1i(m_defaultShader.getUniformLocation("hasTexCoords"), GL_TRUE);
-                glUniform1i(m_defaultShader.getUniformLocation("useMaterial"), GL_FALSE);
+                m_selShader->bind();
+
+                glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+                glUniformMatrix3fv(m_defaultShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
+
+                glUniformMatrix4fv(m_defaultShader.getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP)); // unnesscary and will be changed for multi light
+                glUniform3fv(m_defaultShader.getUniformLocation("viewPos"), 1, glm::value_ptr(selectedCamera->cameraPos()));
+
+                if (mesh.hasTextureCoords()) {
+                    m_texture.bind(GL_TEXTURE0);
+                    glUniform1i(m_selShader->getUniformLocation("colorMap"), 0);
+                    glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), GL_TRUE);
+                    glUniform1i(m_selShader->getUniformLocation("useMaterial"), GL_FALSE);
+                }
+                else {
+                    glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), GL_FALSE);
+                    glUniform1i(m_selShader->getUniformLocation("useMaterial"), m_useMaterial);
+                }
+
+                genUboBufferObj(m_PbrMaterial, PbrUBO);
+                genUboBufferObj(lights, lightUBO,MAX_LIGHT_CNT);       // Pass Multiple Lights for multiple Light Data Shading
+                glUniform1i(m_selShader->getUniformLocation("LightCount"), static_cast<GLint>(lights.size()));
+
+                if (usePbrShading) mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
+                else mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
             }
             else {
-                glUniform1i(m_defaultShader.getUniformLocation("hasTexCoords"), GL_FALSE);
-                glUniform1i(m_defaultShader.getUniformLocation("useMaterial"), m_useMaterial);
+
+                m_selShader = &m_defaultShader;
+                m_selShader->bind();
+
+                glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+                glUniformMatrix3fv(m_defaultShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
+
+                glUniformMatrix4fv(m_defaultShader.getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
+                glUniform3fv(m_defaultShader.getUniformLocation("viewPos"), 1, glm::value_ptr(selectedCamera->cameraPos()));
+
+                if (mesh.hasTextureCoords()) {
+                    m_texture.bind(GL_TEXTURE0);
+                    glUniform1i(m_selShader->getUniformLocation("colorMap"), 0);
+                    glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), GL_TRUE);
+                    glUniform1i(m_selShader->getUniformLocation("useMaterial"), GL_FALSE);
+                }
+                else {
+                    glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), GL_FALSE);
+                    glUniform1i(m_selShader->getUniformLocation("useMaterial"), m_useMaterial);
+                }
+
+                genUboBufferObj(*selectedLight, lightUBO);   // Pass single Light
+                // pass in shadow Setting as UBO
+                //m_defaultShader.bindUniformBlock("shadowSetting", 2, shadowSettingUbo);
+                mesh.draw(*m_selShader, lightUBO,multiLightShadingEnabled);
             }
 
-            // pass in shadow Setting as UBO
-            m_defaultShader.bindUniformBlock("shadowSetting", 2, shadowSettingUbo);
-
-            // genUboBufferObj(lights, lightUBO);       // Pass Multiple Lights for multiple Light Data Shading
-            genUboBufferObj(selectedLight, lightUBO);   // Pass single Light
-            mesh.draw(m_defaultShader,lightUBO);
             
             int lightsCnt = static_cast<int>(lights.size());
             glBindVertexArray(mesh.getVao());
@@ -249,6 +305,7 @@ void Application::imgui() {
         /* ImGui::SliderInt("Toon Discretization", &m_Material.toonDiscretize, 1, 10);
          ImGui::SliderFloat("Toon Specular Threshold", &m_Material.toonSpecularThreshold, 0.0f, 1.0f);*/
 
+        this->usePbrShading = false;
     }
     else if (static_cast<MaterialModel>(curMaterialIndex) == MaterialModel::PBR) {
         ImGui::Separator();
@@ -257,6 +314,8 @@ void Application::imgui() {
         ImGui::SliderFloat("Metallic", &m_PbrMaterial.metallic,0.0f,1.0f);
         ImGui::SliderFloat("Roughness", &m_PbrMaterial.roughness, 0.0f, 1.0f);
         ImGui::SliderFloat("Ambient Occlusion", &m_PbrMaterial.ao, 0.0f, 1.0f);
+
+        this->usePbrShading = true;
     }
 
     ImGui::Separator();
@@ -266,7 +325,7 @@ void Application::imgui() {
 
     ImGui::Separator();
     ImGui::Text("Lights");
-
+    ImGui::Checkbox("MultiLightShading", &multiLightShadingEnabled);
     itemStrings.clear();
     for (size_t i = 0; i < lights.size(); i++) {
         auto string = "Light " + std::to_string(i);
@@ -293,7 +352,7 @@ void Application::imgui() {
     ImGui::InputFloat3("Position", &selectedLight->position[0]);
 
     if (ImGui::Button("Add Lights")) {
-        lights.push_back(Light{ glm::vec3(0.4f, 1.2f, 0.0f), glm::vec3(1) });
+        lights.push_back(Light{ glm::vec3(1, 3, -2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ });
     }
 
     if (ImGui::Button("Remove Lights")) {

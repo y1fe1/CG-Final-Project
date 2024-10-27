@@ -56,7 +56,8 @@ public:
     // Bind VAO and call glDrawElements.
     void draw(const Shader& drawingShader);
 
-    void draw(const Shader& drawingShader, GLuint drawingUBO);
+    void draw(const Shader& drawingShader, GLuint& drawingUBO, bool multiLightShadingEnabled);
+    void drawPBR(const Shader& drawingShader, GLuint& PbrUbo, GLuint& drawingUBO);
 
     void drawBasic(const Shader& drawingShader);
 
