@@ -36,8 +36,10 @@ struct shadowLoadingException : public std::runtime_error {
 };
 
 struct shadowSetting {
-    bool shadowEnabled = false;
-    bool pcfEnabled = false;
+    alignas(4) bool shadowEnabled = 0;  // 4 bytes
+    alignas(4) bool pcfEnabled = 0;     // 4 bytes
+    alignas(4) bool _UNUSE_PADDING0 = 0; // Additional 8 bytes for 16-byte alignment
+    alignas(4) bool _UNUSE_PADDING1 = 0;
 };
 
 inline const int MAXLIGHT = 10;
@@ -106,6 +108,58 @@ struct Light {
 };
 
 inline Light defaultLight = { glm::vec3(0, 0, 3), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/};
+
+struct ShadowTexture {
+public:
+    ShadowTexture() {
+        m_texture = INVALID;
+    }
+
+    ShadowTexture(const int SHADOWTEX_WIDTH, const int SHADOWTEX_HEIGHT, GLuint& frameBuffer) {
+        glGenTextures(1, &m_texture);
+        glBindTexture(GL_TEXTURE_2D, m_texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+
+        // Set behavior for when texture coordinates are outside the [0, 1] range.
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        // Set interpolation for texture sampling (GL_NEAREST for no interpolation).
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        glGenFramebuffers(1, &frameBuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_texture, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+    ShadowTexture(const ShadowTexture&) = delete;
+
+    ShadowTexture(ShadowTexture&& other) : m_texture(other.m_texture)
+    {
+        other.m_texture = INVALID;
+    }
+
+    ~ShadowTexture() {
+        if (m_texture != INVALID)
+            glDeleteTextures(1, &m_texture);
+    }
+
+    ShadowTexture& operator=(const ShadowTexture&) = delete;
+    ShadowTexture& operator=(ShadowTexture&&) = default;
+
+    void bind(GLint textureSlot) {
+        glActiveTexture(textureSlot);
+        glBindTexture(GL_TEXTURE_2D, m_texture);
+    }
+
+private:
+    static constexpr GLuint INVALID = 0xFFFFFFFF;
+    GLuint m_texture{ INVALID };
+};
+
 
 
 template <typename T>

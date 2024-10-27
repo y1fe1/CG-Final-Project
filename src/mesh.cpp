@@ -137,7 +137,10 @@ void GPUMesh::draw(const Shader& drawingShader, GLuint& drawingUBO, bool multiLi
 
     // Draw the mesh's triangles
     glBindVertexArray(m_vao);
+
+    glViewport(0, 0, WIDTH, HEIGHT);
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
+
     glBindVertexArray(0);
 }
 
@@ -149,7 +152,10 @@ void GPUMesh::drawPBR(const Shader& drawingShader, GLuint& PbrUbo, GLuint& drawi
 
     // Draw the mesh's triangles
     glBindVertexArray(m_vao);
+
+    glViewport(0, 0, WIDTH, HEIGHT);
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
+
     glBindVertexArray(0);
 }
 
@@ -157,7 +163,10 @@ void GPUMesh::drawBasic(const Shader& drawingShader)
 {
     // Draw the mesh's triangles
     glBindVertexArray(m_vao);
+
+    glViewport(0, 0, WIDTH, HEIGHT);
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
+
     glBindVertexArray(0);
 }
 
@@ -174,20 +183,18 @@ void GPUMesh::drawShadowMap(const Shader& shadowShader, glm::mat4 lightMVP, GLui
     // Set viewport size
     glViewport(0, 0, SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
 
-    glUniformMatrix4fv(shadowShader.getUniformLocation("mvp"), 1, GL_FALSE, glm::value_ptr(lightMVP));
+    glUniformMatrix4fv(shadowShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(lightMVP));
 
     // Bind vertex data
     glBindVertexArray(m_shadowVao);
 
-    glVertexAttribPointer(shadowShader.getAttributeLocation("pos"), 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
+    glVertexAttribPointer(shadowShader.getAttributeLocation("position"), 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
 
     // Execute draw command
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
 
     // Unbind the off-screen framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    glBindVertexArray(0);
 }
 
 void GPUMesh::moveInto(GPUMesh&& other)

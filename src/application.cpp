@@ -56,9 +56,14 @@ Application::Application()
             onMouseReleased(button, mods);
         });
 
-    m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/scene.obj");
+    m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/dragon.obj");
 
     try {
+        ShaderBuilder debugShader;
+        debugShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/shader_vert.glsl");
+        debugShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/debugShader_frag.glsl");
+        m_debugShader = debugShader.build();
+
         ShaderBuilder defaultBuilder;
         defaultBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/shader_vert.glsl");
         defaultBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/shader_frag.glsl");
@@ -93,25 +98,7 @@ Application::Application()
 
     // === Create Shadow Texture ===
     try {
-        glGenTextures(1, &texShadow);
-        glBindTexture(GL_TEXTURE_2D, texShadow);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-
-        // Set behavior for when texture coordinates are outside the [0, 1] range.
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-        // Set interpolation for texture sampling (GL_NEAREST for no interpolation).
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        glBindTexture(GL_TEXTURE_2D, 0);
-
-        glGenFramebuffers(1, &framebuffer);
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texShadow, 0);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
+        m_shadowTex = ShadowTexture(SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT,framebuffer);
     }
     catch (shadowLoadingException e) {
         std::cerr << e.what() << std::endl;
@@ -125,9 +112,9 @@ void Application::update() {
         this->imgui();
 
         selectedCamera->updateInput();
-        m_viewMatrix = selectedCamera->viewMatrix();
 
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+
         glClearDepth(1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -140,13 +127,15 @@ void Application::update() {
         glm::mat4 lightViewMatrix = glm::lookAt(selectedLight->position, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         lightMVP = mainProjectionMatrix * lightViewMatrix;
 
+        m_viewMatrix = selectedCamera->viewMatrix();
+
         const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
         const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(m_modelMatrix));
 
         for (GPUMesh& mesh : m_meshes) {
             //shadow maps generates the shadows
 #pragma region shadow Map Genereates
-            if (shadowSettings.shadowEnabled)
+            if (TRUE)
             {
                 mesh.drawShadowMap(m_shadowShader, lightMVP, framebuffer, SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
             }
@@ -157,76 +146,79 @@ void Application::update() {
             genUboBufferObj(m_Material, newUBOMaterial);
             mesh.setUBOMaterial(newUBOMaterial);
 
-            // genereate ShadowSetting UBO
+            // generate UBO for shadowSetting
             GLuint shadowSettingUbo;
             genUboBufferObj(shadowSettings, shadowSettingUbo);
 
+            // Draw mesh into depth buffer but disable color writes.
+            //glDepthMask(GL_TRUE);
+            //glDepthFunc(GL_LEQUAL);
+            //glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+
+            //m_debugShader.bind();
+
+            //mesh.drawBasic(m_debugShader);
+
+            //// Draw the mesh again for each light / shading model.
+            //glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); // Enable color writes.
+            //glDepthMask(GL_FALSE); // Disable depth writes.
+            //glDepthFunc(GL_EQUAL); // Only draw a pixel if it's depth matches the value stored in the depth buffer.
+            //glEnable(GL_BLEND); // Enable blending.
+            //glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+
+            GLuint PbrUBO;
+
             if (multiLightShadingEnabled) {
-               
-                GLuint PbrUBO;
-                if (usePbrShading) {
-                    m_selShader = &m_pbrShader;
-
-                }
-                else {
-                    m_selShader = &m_multiLightShader;
-                }
-
-                m_selShader->bind();
-
-                glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
-                glUniformMatrix3fv(m_defaultShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
-
-                glUniformMatrix4fv(m_defaultShader.getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP)); // unnesscary and will be changed for multi light
-                glUniform3fv(m_defaultShader.getUniformLocation("viewPos"), 1, glm::value_ptr(selectedCamera->cameraPos()));
-
-                if (mesh.hasTextureCoords()) {
-                    m_texture.bind(GL_TEXTURE0);
-                    glUniform1i(m_selShader->getUniformLocation("colorMap"), 0);
-                    glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), GL_TRUE);
-                    glUniform1i(m_selShader->getUniformLocation("useMaterial"), GL_FALSE);
-                }
-                else {
-                    glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), GL_FALSE);
-                    glUniform1i(m_selShader->getUniformLocation("useMaterial"), m_useMaterial);
-                }
-
-                genUboBufferObj(m_PbrMaterial, PbrUBO);
-                genUboBufferObj(lights, lightUBO,MAX_LIGHT_CNT);       // Pass Multiple Lights for multiple Light Data Shading
-                glUniform1i(m_selShader->getUniformLocation("LightCount"), static_cast<GLint>(lights.size()));
-
-                if (usePbrShading) mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
-                else mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
+                m_selShader = usePbrShading ? &m_pbrShader : &m_multiLightShader;
             }
             else {
-
                 m_selShader = &m_defaultShader;
-                m_selShader->bind();
-
-                glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
-                glUniformMatrix3fv(m_defaultShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
-
-                glUniformMatrix4fv(m_defaultShader.getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
-                glUniform3fv(m_defaultShader.getUniformLocation("viewPos"), 1, glm::value_ptr(selectedCamera->cameraPos()));
-
-                if (mesh.hasTextureCoords()) {
-                    m_texture.bind(GL_TEXTURE0);
-                    glUniform1i(m_selShader->getUniformLocation("colorMap"), 0);
-                    glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), GL_TRUE);
-                    glUniform1i(m_selShader->getUniformLocation("useMaterial"), GL_FALSE);
-                }
-                else {
-                    glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), GL_FALSE);
-                    glUniform1i(m_selShader->getUniformLocation("useMaterial"), m_useMaterial);
-                }
-
-                genUboBufferObj(*selectedLight, lightUBO);   // Pass single Light
-                // pass in shadow Setting as UBO
-                //m_defaultShader.bindUniformBlock("shadowSetting", 2, shadowSettingUbo);
-                mesh.draw(*m_selShader, lightUBO,multiLightShadingEnabled);
             }
 
-            
+            //m_selShader = &m_debugShader;
+            m_selShader->bind();
+
+            // Set up matrices and view position
+            glUniformMatrix4fv(m_selShader->getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+            glUniformMatrix3fv(m_selShader->getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
+            glUniformMatrix4fv(m_selShader->getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
+            glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(selectedCamera->cameraPos()));
+
+            // Texture and material settings
+            bool hasTexCoords = mesh.hasTextureCoords();
+            m_texture.bind(hasTexCoords ? GL_TEXTURE0 : 0);
+            glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), hasTexCoords);
+            glUniform1i(m_selShader->getUniformLocation("colorMap"), hasTexCoords ? 0 : -1);
+            glUniform1i(m_selShader->getUniformLocation("useMaterial"), hasTexCoords ? GL_FALSE : m_useMaterial);
+
+            // Pass in shadow settings as UBO
+            m_selShader->bindUniformBlock("shadowSetting", 2, shadowSettingUbo);
+            m_shadowTex.bind(GL_TEXTURE1);
+            glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
+
+            // Generate UBOs and draw
+            if (multiLightShadingEnabled) {
+                genUboBufferObj(m_PbrMaterial, PbrUBO);
+                genUboBufferObj(lights, lightUBO, MAX_LIGHT_CNT);
+                glUniform1i(m_selShader->getUniformLocation("LightCount"), static_cast<GLint>(lights.size()));
+
+                if (usePbrShading) {
+                    mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
+                }
+                else {
+                    mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
+                }
+            }
+            else {
+                genUboBufferObj(*selectedLight, lightUBO); // Pass single Light
+                mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
+            }
+
+            ////// Restore default depth test settings and disable blending.
+            //glDepthFunc(GL_LEQUAL);
+            //glDepthMask(GL_TRUE);
+            //glDisable(GL_BLEND);
+
             int lightsCnt = static_cast<int>(lights.size());
             glBindVertexArray(mesh.getVao());
             m_lightShader.bind();

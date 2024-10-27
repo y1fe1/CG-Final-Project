@@ -16,6 +16,7 @@ private:
 
     GLuint lightUBO;
 
+    Shader m_debugShader;
     Shader m_defaultShader;
     Shader m_multiLightShader;
     Shader m_pbrShader;
@@ -45,10 +46,11 @@ private:
 
     //Shadow
     shadowSetting shadowSettings;
-    GLuint texShadow;
+    GLuint framebuffer;
+    ShadowTexture m_shadowTex;
+
     const int SHADOWTEX_WIDTH = 1024;
     const int SHADOWTEX_HEIGHT = 1024;
-    GLuint framebuffer;
     
     void imgui();
 
