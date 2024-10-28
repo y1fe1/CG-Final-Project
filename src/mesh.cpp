@@ -186,9 +186,9 @@ void GPUMesh::drawShadowMap(const Shader& shadowShader, glm::mat4 lightMVP, GLui
     glUniformMatrix4fv(shadowShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(lightMVP));
 
     // Bind vertex data
-    glBindVertexArray(m_shadowVao);
+    glBindVertexArray(m_vao);
 
-    glVertexAttribPointer(shadowShader.getAttributeLocation("position"), 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
 
     // Execute draw command
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);

@@ -5,12 +5,12 @@
 Application::Application()
     : m_window("Final Project", glm::ivec2(1024, 1024), OpenGLVersion::GL41)
     , m_texture(RESOURCE_ROOT "resources/checkerboard.png")
-    , m_projectionMatrix(glm::perspective(glm::radians(80.0f), 1.0f, 0.1f, 30.0f))
+    , m_projectionMatrix(glm::perspective(glm::radians(80.0f), m_window.getAspectRatio(), 0.01f, 100.0f))
     , m_viewMatrix(glm::lookAt(glm::vec3(-1, 1, -1), glm::vec3(0), glm::vec3(0, 1, 0)))
     , m_modelMatrix(1.0f)
     , cameras{
         { &m_window, glm::vec3(1.2f, 1.1f, 0.9f), -glm::vec3(1.2f, 1.1f, 0.9f) },
-        { &m_window, glm::vec3(3.8f, 1.0f, 0.06f), -glm::vec3(1.8f, 1.0f, 0.5f) }
+        { &m_window, glm::vec3(3.8f, 1.0f, 0.06f), -glm::vec3(3.8f, 1.0f, 0.06f) }
     },
     // init PBR material
     m_PbrMaterial{ glm::vec3{ 0.8, 0.6, 0.4 }, 1.0f, 0.2f, 1.0f }
@@ -36,7 +36,8 @@ Application::Application()
 
     // init normal material
     m_Material.kd = glm::vec3{ 0.5f, 0.5f, 1.0f };
-    m_Material.ks = glm::vec3{ 0.1, 1.0, 0.1 };
+    m_Material.ks = glm::vec3{ 0.1f, 1.0f, 0.1f };
+    m_Material.shininess = 3.0f;
 
     selectedCamera = &cameras.at(curCameraIndex);
     selectedLight = &lights.at(curLightIndex);
@@ -56,7 +57,7 @@ Application::Application()
             onMouseReleased(button, mods);
         });
 
-    m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/dragon.obj");
+    m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/scene.obj");
 
     try {
         ShaderBuilder debugShader;
@@ -98,7 +99,7 @@ Application::Application()
 
     // === Create Shadow Texture ===
     try {
-        m_shadowTex = ShadowTexture(SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT,framebuffer);
+        m_shadowTex = ShadowTexture(SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
     }
     catch (shadowLoadingException e) {
         std::cerr << e.what() << std::endl;
@@ -106,7 +107,6 @@ Application::Application()
 }
 
 void Application::update() {
-    int dummyInteger = 0;
     while (!m_window.shouldClose()) {
         m_window.updateInput();
         this->imgui();
@@ -137,13 +137,14 @@ void Application::update() {
 #pragma region shadow Map Genereates
             if (TRUE)
             {
-                mesh.drawShadowMap(m_shadowShader, lightMVP, framebuffer, SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
+                mesh.drawShadowMap(m_shadowShader, lightMVP, m_shadowTex.getFramebuffer(), SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
             }
 #pragma endregion
 
             // set new Material every time it is updated
             GLuint newUBOMaterial;
-            genUboBufferObj(m_Material, newUBOMaterial);
+            GPUMaterial gpuMat = GPUMaterial(m_Material);
+            genUboBufferObj(gpuMat, newUBOMaterial);
             mesh.setUBOMaterial(newUBOMaterial);
 
             // generate UBO for shadowSetting
@@ -214,7 +215,7 @@ void Application::update() {
                 mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
             }
 
-            ////// Restore default depth test settings and disable blending.
+            // Restore default depth test settings and disable blending.
             //glDepthFunc(GL_LEQUAL);
             //glDepthMask(GL_TRUE);
             //glDisable(GL_BLEND);

@@ -115,7 +115,7 @@ public:
         m_texture = INVALID;
     }
 
-    ShadowTexture(const int SHADOWTEX_WIDTH, const int SHADOWTEX_HEIGHT, GLuint& frameBuffer) {
+    ShadowTexture(const int SHADOWTEX_WIDTH, const int SHADOWTEX_HEIGHT) {
         glGenTextures(1, &m_texture);
         glBindTexture(GL_TEXTURE_2D, m_texture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
@@ -130,8 +130,8 @@ public:
 
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        glGenFramebuffers(1, &frameBuffer);
-        glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+        glGenFramebuffers(1, &m_frameBuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, m_frameBuffer);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_texture, 0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
@@ -155,9 +155,14 @@ public:
         glBindTexture(GL_TEXTURE_2D, m_texture);
     }
 
+    GLuint& getFramebuffer() {
+        return m_frameBuffer;
+    }
+
 private:
     static constexpr GLuint INVALID = 0xFFFFFFFF;
     GLuint m_texture{ INVALID };
+    GLuint m_frameBuffer{ INVALID };
 };
 
 

@@ -19,11 +19,10 @@ layout(std140) uniform PBR_Material
 
 // Shadow Setting
 layout(std140) uniform shadowSetting{
-
     bool shadowEnabled;
     bool pcfEnabled;
-    bool transparencyEnabled;
 };
+
 uniform sampler2D texShadow;
 
 //Light Setting

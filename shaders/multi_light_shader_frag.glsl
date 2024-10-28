@@ -21,7 +21,6 @@ layout(std140) uniform shadowSetting{
     bool pcfEnabled;
     bool transparencyEnabled;
 };
-uniform sampler2D texShadow;
 
 //Light Setting
 struct Light {
@@ -45,7 +44,8 @@ layout(std140) uniform lights{
 
 uniform int LightCount;
 
-uniform mat4 lightMVP;
+uniform sampler2D texShadows[MAX_LIGHT_CNT];
+uniform mat4 lightMVPs[MAX_LIGHT_CNT];
 
 uniform vec3 viewPos;
 
@@ -63,7 +63,7 @@ in vec2 fragTexCoord;
 layout(location = 0) out vec4 fragColor;
 
 
-float shadowFactorCal(vec2 shadowMapCoord, float fragLightDepth){
+float shadowFactorCal(int lightIdx,vec2 shadowMapCoord, float fragLightDepth){
 
     const float bias = 0.005; 
 
@@ -73,7 +73,7 @@ float shadowFactorCal(vec2 shadowMapCoord, float fragLightDepth){
     if(!pcfEnabled)
     {
          // Retrieve the shadow map depth value at this coordinate
-        float shadowMapDepth = texture(texShadow, shadowMapCoord).x;
+        float shadowMapDepth = texture(texShadows[lightIdx], shadowMapCoord).x;
         shadowFactor = (fragLightDepth > shadowMapDepth + bias) ? 1.0: 0.0; // Shadow factor
     } 
 
@@ -82,12 +82,12 @@ float shadowFactorCal(vec2 shadowMapCoord, float fragLightDepth){
         // PCF 
         float shadowSum = 0.0;
         float sampleCount = 9.0f; // Total number of samples
-        vec2 texelSize  = 1.0/textureSize(texShadow,0); // Radius for PCF sampling
+        vec2 texelSize  = 1.0/textureSize(texShadows[lightIdx],0); // Radius for PCF sampling
 
         for (int x = -1; x <= 1; ++x) {
             for (int y = -1; y <= 1; ++y) {
                 vec2 offset = vec2(float(x), float(y)) * texelSize;
-                float shadowMapDepth = texture(texShadow, shadowMapCoord + offset).r;
+                float shadowMapDepth = texture(texShadows[lightIdx], shadowMapCoord + offset).r;
                 shadowSum += (fragLightDepth > shadowMapDepth + bias) ? 1.0 : 0.0;
             }
          }
@@ -110,21 +110,6 @@ float getLightAttenuationFactor(vec3 lightDir) {
 
 void main()
 {
-
-    vec4 fragLightCoord = lightMVP * vec4(fragPosition, 1.0);
-    // Convert to normalized device coordinates
-    fragLightCoord.xyz /= fragLightCoord.w; // Homogeneous divide
-    
-    // Transform from NDC to texture space (0 to 1)
-
-    fragLightCoord.xyz = fragLightCoord.xyz * 0.5 + 0.5;
-    
-    // Fragment depth in light space
-    float fragLightDepth = fragLightCoord.z;
-
-    // Shadow map coordinates (XY)
-    vec2 shadowMapCoord = fragLightCoord.xy;
-
     vec3 Specular = vec3(0.0f);
 
     vec3 normal = normalize(fragNormal);
@@ -132,16 +117,31 @@ void main()
 
     vec3 ambient = ambientColor;
 
-    float shadowFactor = (shadowEnabled)? shadowFactorCal(shadowMapCoord,fragLightDepth) : 0.0f;
-
     vec3 LightIntensity = vec3(0.0f);
 
+    vec3 texColor = vec3(0.0f);
     if (hasTexCoords)       { 
-        fragColor = vec4(texture(colorMap, fragTexCoord).rgb, 1);
+         texColor = texture(colorMap, fragTexCoord).rgb;
     }
     else if (useMaterial)   { 
         
         for (int idx = 0; idx < LightCount; idx++){
+
+            vec4 fragLightCoord = lightMVPs[idx] * vec4(fragPosition, 1.0);
+            // Convert to normalized device coordinates
+            fragLightCoord.xyz /= fragLightCoord.w; // Homogeneous divide
+    
+            // Transform from NDC to texture space (0 to 1)
+
+            fragLightCoord.xyz = fragLightCoord.xyz * 0.5 + 0.5;
+    
+            // Fragment depth in light space
+            float fragLightDepth = fragLightCoord.z;
+
+            // Shadow map coordinates (XY)
+            vec2 shadowMapCoord = fragLightCoord.xy;
+
+            float shadowFactor = (shadowEnabled)? shadowFactorCal(idx,shadowMapCoord,fragLightDepth) : 0.0f;
 
             vec3 lightDir = normalize(LightList[idx].position - fragPosition);
             
@@ -149,19 +149,21 @@ void main()
             float lambert = max(dot(normal,lightDir),0.0);
 
             //lambert factor
-            vec3 diffuse = lambert*kd;
+            vec3 diffuse = (hasTexCoords)? lambert*kd*texColor : lambert*kd;
         
             //basic phong model
             if(lambert > 0.0f) {
                 Specular = ks * pow(max(dot(halfDir, normal), 0.0f), shininess);
+                Specular = (hasTexCoords)? texColor * Specular : Specular;
             }
         
             // Calculate the light attenuation factor based on distance
             float lightAttenuationFactor = getLightAttenuationFactor(lightDir);
 
             //vec3 finalColor = (ambient + diffuse + Specular);
-            vec3 finalColor = (diffuse + Specular);
-            fragColor += vec4(finalColor * LightList[idx].color * (1-shadowFactor) * lightAttenuationFactor, 1);
+            vec3 finalColor = (diffuse + Specular) * LightList[idx].color * (1-shadowFactor) * lightAttenuationFactor;
+            //vec3 finalColor = diffuse;
+            fragColor += vec4(finalColor, 1);
         }
     }
     else                    { fragColor = vec4(normal, 1); } // Output color value, change from (1, 0, 0) to something else

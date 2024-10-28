@@ -46,7 +46,6 @@ private:
 
     //Shadow
     shadowSetting shadowSettings;
-    GLuint framebuffer;
     ShadowTexture m_shadowTex;
 
     const int SHADOWTEX_WIDTH = 1024;
