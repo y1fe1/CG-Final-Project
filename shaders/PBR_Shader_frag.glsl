@@ -1,5 +1,7 @@
 #version 410
 
+precision highp float;
+
 #define MAX_LIGHT_CNT 10
 #define PI 3.1415926535897932384626433832795
 
@@ -51,7 +53,12 @@ uniform mat4 lightMVP;
 
 uniform vec3 viewPos;
 
-uniform sampler2D colorMap;
+uniform sampler2D normalMap;
+uniform sampler2D albedoMap;
+uniform sampler2D metallicMap;
+uniform sampler2D roughnessMap;
+uniform sampler2D aoMap;
+
 uniform bool hasTexCoords;
 uniform bool useMaterial;
 
@@ -152,8 +159,43 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
     return g_n_v_k * g_n_l_k;
 }
 
+vec3 normalFromNormalMapGetter(sampler2D normalMap){
+
+    vec3 tangentNormal = texture(normalMap, fragTexCoord).rgb * 2.0 - 1.0;
+
+    vec3 Q1 = dFdx(fragPosition);
+    vec3 Q2  = dFdy(fragPosition);
+    vec2 st1 = dFdx(fragTexCoord);
+    vec2 st2 = dFdy(fragTexCoord);
+
+    vec3 N   = normalize(fragNormal);
+    vec3 T  = normalize(Q1*st2.t - Q2*st1.t);
+    vec3 B  = -normalize(cross(N, T));
+    mat3 TBN = mat3(T, B, N);
+
+    return normalize(TBN * tangentNormal);
+}
+
+
 void main()
 {
+
+    vec3 Albedo = albedo;
+    vec3 normal = normalize(fragNormal);
+    float Metallic = metallic;
+    float Roughness = roughness;
+    float Ao = ao;
+
+    if (hasTexCoords)       { 
+        //fragColor = vec4(texture(colorMap, fragTexCoord).rgb, 1);
+
+        Albedo = pow(texture(albedoMap,fragTexCoord).rgb, vec3(2.2));
+        normal = normalFromNormalMapGetter(normalMap);
+        Metallic  = texture(metallicMap, fragTexCoord).r;
+        Roughness = texture(roughnessMap, fragTexCoord).r;
+        Ao        = texture(aoMap, fragTexCoord).r;
+
+    }
 
     vec4 fragLightCoord = lightMVP * vec4(fragPosition, 1.0);
     // Convert to normalized device coordinates
@@ -174,20 +216,14 @@ void main()
     vec3 LightIntensity = vec3(0.0f);
 
     vec3 Specular = vec3(0.0f);
-
-    vec3 normal = normalize(fragNormal);
     vec3 viewDir = normalize(viewPos - fragPosition);
 
     vec3 F0 = vec3(0.04);
-    F0 = mix(F0, albedo, metallic);
+    F0 = mix(F0, Albedo, Metallic);
 
     vec3 finalColor = vec3(0.0f);
 
-
-    if (hasTexCoords)       { 
-        fragColor = vec4(texture(colorMap, fragTexCoord).rgb, 1);
-    }
-    else if (useMaterial)   { 
+    if (useMaterial) { 
         
         for (int idx = 0; idx < LightCount; ++idx){
 
@@ -201,13 +237,13 @@ void main()
             vec3 radiance = LightList[idx].color * lightAttenuationFactor;
 
             // Cook Tolerance
-            float NDF = DistributionGGX(normal, halfDir, roughness);
-            float G = GeometrySmith(normal,viewDir,lightDir,roughness);
+            float NDF = DistributionGGX(normal, halfDir, Roughness);
+            float G = GeometrySmith(normal,viewDir,lightDir,Roughness);
             vec3 F = fresnelSchlick(max(dot(halfDir, viewDir), 0.0), F0);
 
             vec3 kS = F;
             vec3 kD = vec3(1.0)-kS;
-            kD *= 1.0 - metallic;
+            kD *= 1.0 - Metallic;
 
             vec3 numerator    = NDF * G * F;
             float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * max(dot(normal, lightDir), 0.0) + 0.0001;
@@ -215,11 +251,11 @@ void main()
 
             float NdotL = max(dot(normal, lightDir), 0.0);                
 
-            finalColor += (kD * albedo / PI + specular) * radiance * NdotL;
+            finalColor += (kD * Albedo / PI + specular) * radiance * NdotL;
             //finalColor += radiance;
         }
 
-        vec3 ambient = vec3(0.03) * albedo * ao;
+        vec3 ambient = vec3(0.03) * Albedo * Ao;
         vec3 color = ambient + finalColor;
 	    
         // gamma correction
@@ -230,7 +266,10 @@ void main()
    
         fragColor = vec4(color, 1.0);
     }
-    else                    { fragColor = vec4(normal, 1); } // Output color value, change from (1, 0, 0) to something else
+    else {
+        fragColor = vec4(normal, 1); 
+    } // Output color value, change from (1, 0, 0) to something else
+
 }
 
 

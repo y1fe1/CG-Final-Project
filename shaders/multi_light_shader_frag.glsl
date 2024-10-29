@@ -119,12 +119,13 @@ void main()
 
     vec3 LightIntensity = vec3(0.0f);
 
-    vec3 texColor = vec3(0.0f);
+    vec4 texColor = vec4(0.0f);
     if (hasTexCoords)       { 
-         texColor = texture(colorMap, fragTexCoord).rgb;
+         texColor = texture(colorMap, fragTexCoord);
     }
-    else if (useMaterial)   { 
-        
+
+    if (useMaterial)   
+    { 
         for (int idx = 0; idx < LightCount; idx++){
 
             vec4 fragLightCoord = lightMVPs[idx] * vec4(fragPosition, 1.0);
@@ -149,12 +150,12 @@ void main()
             float lambert = max(dot(normal,lightDir),0.0);
 
             //lambert factor
-            vec3 diffuse = (hasTexCoords)? lambert*kd*texColor : lambert*kd;
+            vec3 diffuse = (hasTexCoords)? lambert*kd*texColor.rgb : lambert*kd;
         
             //basic phong model
             if(lambert > 0.0f) {
                 Specular = ks * pow(max(dot(halfDir, normal), 0.0f), shininess);
-                Specular = (hasTexCoords)? texColor * Specular : Specular;
+                Specular = (hasTexCoords)? texColor.rgb * Specular : Specular;
             }
         
             // Calculate the light attenuation factor based on distance
@@ -166,7 +167,9 @@ void main()
             fragColor += vec4(finalColor, 1);
         }
     }
-    else                    { fragColor = vec4(normal, 1); } // Output color value, change from (1, 0, 0) to something else
+    else  { 
+         fragColor = (hasTexCoords)? texColor :vec4(normal, 1);     
+    } // Output color value, change from (1, 0, 0) to something else
 }
 
 

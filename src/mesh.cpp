@@ -47,6 +47,7 @@ GPUMesh::GPUMesh(const Mesh& cpuMesh)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
+
     // Reuse all attributes for each instance
     glVertexAttribDivisor(0, 0);
     glVertexAttribDivisor(1, 0);
@@ -90,6 +91,17 @@ std::vector<GPUMesh> GPUMesh::loadMeshGPU(std::filesystem::path filePath, bool n
     return gpuMeshes;
 }
 
+std::vector<GPUMesh> GPUMesh::loadMeshGPU(std::vector<Mesh> cpuMeshs) {
+
+    std::vector<GPUMesh> gpuMeshes;
+
+    for (const Mesh& mesh : cpuMeshs) {
+        gpuMeshes.emplace_back(mesh);
+    }
+
+    return gpuMeshes;
+}
+
 bool GPUMesh::hasTextureCoords() const
 {
     return m_hasTextureCoords;
@@ -119,7 +131,12 @@ void GPUMesh::draw(const Shader& drawingShader)
 
     // Draw the mesh's triangles
     glBindVertexArray(m_vao);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
+
     glBindVertexArray(0);
 }
 
@@ -137,6 +154,10 @@ void GPUMesh::draw(const Shader& drawingShader, GLuint& drawingUBO, bool multiLi
 
     // Draw the mesh's triangles
     glBindVertexArray(m_vao);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
 
     glViewport(0, 0, WIDTH, HEIGHT);
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
@@ -170,7 +191,7 @@ void GPUMesh::drawBasic(const Shader& drawingShader)
     glBindVertexArray(0);
 }
 
-void GPUMesh::drawShadowMap(const Shader& shadowShader, glm::mat4 lightMVP, GLuint texShadowBuffer, const int SHADOWTEX_WIDTH, const int SHADOWTEX_HEIGHT)
+void GPUMesh::drawShadowMap(const Shader& shadowShader, glm::mat4 lightMVP, GLuint& texShadowBuffer, const int SHADOWTEX_WIDTH, const int SHADOWTEX_HEIGHT)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, texShadowBuffer);
 

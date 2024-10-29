@@ -46,6 +46,8 @@ uniform bool useMaterial;
 
 uniform vec3 ambientColor;
 
+uniform mat3 normalModelMatrix;
+
 in vec3 fragPosition;
 in vec3 fragNormal;
 in vec2 fragTexCoord;
@@ -121,7 +123,7 @@ void main()
     vec3 normal = normalize(fragNormal);
 
     vec3 viewDir = normalize(viewPos - fragPosition);
-    vec3 lightDir = normalize(position - fragPosition);
+    vec3 lightDir = normalModelMatrix * normalize(position - fragPosition);
 
     vec3 reflectDir = reflect(-lightDir, normal);
     vec3 halfDir = normalize(lightDir + viewDir);
@@ -131,35 +133,38 @@ void main()
 
     float shadowFactor = (shadowEnabled)? shadowFactorCal(shadowMapCoord,fragLightDepth) : 0.0f;
     
-    vec3 texColor = vec3(0.0f);
+    vec4 texColor = vec4(0.0f);
 
-    if (hasTexCoords)       { 
-        texColor = texture(colorMap, fragTexCoord).rgb;
+    if (hasTexCoords)       {
+       texColor = texture(colorMap, fragTexCoord);
     }
 
-    else if (useMaterial)   { 
+    if (useMaterial)   { 
         
         //lambert factor
-        vec3 diffuse = (hasTexCoords)? lambert*kd*texColor : lambert*kd;
+        vec3 diffuse = (hasTexCoords)? lambert*kd*texColor.rgb : lambert*kd;
         
         //basic blinn-phong model
         if(lambert > 0.0) {
             Specular = ks * pow(max(dot(halfDir,normal), 0.0f), shininess);
-            Specular = (hasTexCoords)? texColor * Specular : Specular;
+            Specular = (hasTexCoords)? texColor.rgb * Specular : Specular;
         }
         
         // Calculate the light attenuation factor based on distance
         float lightAttenuationFactor = getLightAttenuationFactor(lightDir);
 
         //vec3 finalColor = (ambient + diffuse + Specular);
-        vec3 finalColor = (diffuse + Specular);
+        //vec3 finalColor = (diffuse + Specular);
         //vec3 finalColor = diffuse;
         //vec3 finalColor = Specular;
-        //vec3 finalColor = Specular + color * diffuse;
+        vec3 finalColor = Specular + color * diffuse;
 
-        fragColor = vec4(finalColor * color * (1-shadowFactor) * lightAttenuationFactor, 1);
+        fragColor = vec4(finalColor * (1-shadowFactor) * lightAttenuationFactor, 1);
+
     }
-    else                    { fragColor = vec4(normal, 1); } // Output color value, change from (1, 0, 0) to something else
+    else { 
+        fragColor = (hasTexCoords)? texColor :vec4(normal, 1); 
+    } // Output color value, change from (1, 0, 0) to something else
 }
 
 

@@ -4,16 +4,19 @@
 // Constructor
 Application::Application()
     : m_window("Final Project", glm::ivec2(1024, 1024), OpenGLVersion::GL41)
-    , m_texture(RESOURCE_ROOT "resources/checkerboard.png")
-    , m_projectionMatrix(glm::perspective(glm::radians(80.0f), m_window.getAspectRatio(), 0.01f, 100.0f))
+    , texturePath("resources/texture/wall.jpg")
+    , m_texture(RESOURCE_ROOT "resources/texture/wall.jpg")
+    , m_projectionMatrix(glm::perspective(glm::radians(80.0f), m_window.getAspectRatio(), 0.1f, 30.0f))
     , m_viewMatrix(glm::lookAt(glm::vec3(-1, 1, -1), glm::vec3(0), glm::vec3(0, 1, 0)))
     , m_modelMatrix(1.0f)
     , cameras{
         { &m_window, glm::vec3(1.2f, 1.1f, 0.9f), -glm::vec3(1.2f, 1.1f, 0.9f) },
         { &m_window, glm::vec3(3.8f, 1.0f, 0.06f), -glm::vec3(3.8f, 1.0f, 0.06f) }
-    },
+    }
+    ,
     // init PBR material
-    m_PbrMaterial{ glm::vec3{ 0.8, 0.6, 0.4 }, 1.0f, 0.2f, 1.0f }
+    m_PbrMaterial{ glm::vec3{ 0.8, 0.6, 0.4 }, 1.0f, 0.2f, 1.0f },
+    trackball{ &m_window, glm::radians(50.0f) }
 {
     //Camera defaultCamera = Camera(&m_window);
 
@@ -22,14 +25,20 @@ Application::Application()
         { glm::vec3(1, 3, -2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
     );
 
-    //lights.push_back(
-    //    { glm::vec3(0, 0, 2), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
-    //);
+    lights.push_back(
+        { glm::vec3(-1, 3, 2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
+    );
+
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/normal.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/albedo.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/metallic.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/roughness.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/ao.png")));
 
     //lights.push_back(
     //    { glm::vec3(2, 1, 2), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
     //);
-
+    
     //lights.push_back(
     //    { glm::vec3(1,1, 3), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
     //);
@@ -41,6 +50,11 @@ Application::Application()
 
     selectedCamera = &cameras.at(curCameraIndex);
     selectedLight = &lights.at(curLightIndex);
+
+    glm::vec3 look_at = { 0.0, 1.0, -1.0 };
+    glm::vec3 rotations = { 0.2, 0.0, 0.0 };
+    auto dist = 1.0;
+    trackball.setCamera(look_at, rotations, dist);
 
     m_window.registerKeyCallback([this](int key, int scancode, int action, int mods) {
         if (action == GLFW_PRESS)
@@ -57,12 +71,23 @@ Application::Application()
             onMouseReleased(button, mods);
         });
 
-    m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/scene.obj");
+    std::string textureFullPath = std::string(RESOURCE_ROOT) + texturePath;
+    std::vector<Mesh> cpuMeshes = loadMesh(RESOURCE_ROOT "resources/sphere.obj");
+
+    if (std::filesystem::exists((textureFullPath))) {
+        std::shared_ptr texPtr = std::make_shared<Image>(textureFullPath);
+        for (auto& mesh : cpuMeshes) {
+            mesh.material.kdTexture = texPtr;
+        }
+    }
+
+    //m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/sphere.obj");
+    m_meshes = GPUMesh::loadMeshGPU(cpuMeshes);  // load mesh from mesh list so we have more freedom on setting up each mesh
 
     try {
         ShaderBuilder debugShader;
         debugShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/shader_vert.glsl");
-        debugShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/debugShader_frag.glsl");
+        debugShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/debug_frag.glsl");
         m_debugShader = debugShader.build();
 
         ShaderBuilder defaultBuilder;
@@ -109,6 +134,9 @@ Application::Application()
 void Application::update() {
     while (!m_window.shouldClose()) {
         m_window.updateInput();
+
+        m_materialChangedByUser = false;
+
         this->imgui();
 
         selectedCamera->updateInput();
@@ -121,14 +149,22 @@ void Application::update() {
         glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
 
+        m_viewMatrix = selectedCamera->viewMatrix();
+
+        //const glm::vec3 cameraPos = trackball.position();
+        const glm::vec3 cameraPos = selectedCamera->cameraPos();
+        const glm::mat4 model{ 1.0f };
+
+        const glm::mat4 view = trackball.viewMatrix();
+        const glm::mat4 projection = trackball.projectionMatrix();
+
         glm::mat4 lightMVP;
         GLfloat near_plane = 0.5f, far_plane = 30.0f;
-        glm::mat4 mainProjectionMatrix = glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
+        glm::mat4 mainProjectionMatrix = m_projectionMatrix;//glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
         glm::mat4 lightViewMatrix = glm::lookAt(selectedLight->position, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         lightMVP = mainProjectionMatrix * lightViewMatrix;
 
-        m_viewMatrix = selectedCamera->viewMatrix();
-
+        //glm::mat4 mvpMatrix = projection * view * model;
         const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
         const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(m_modelMatrix));
 
@@ -152,20 +188,22 @@ void Application::update() {
             genUboBufferObj(shadowSettings, shadowSettingUbo);
 
             // Draw mesh into depth buffer but disable color writes.
-            //glDepthMask(GL_TRUE);
-            //glDepthFunc(GL_LEQUAL);
-            //glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+            glDepthMask(GL_TRUE);
+            glDepthFunc(GL_LEQUAL);
+            glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 
-            //m_debugShader.bind();
+            m_debugShader.bind();
+            glUniformMatrix4fv(m_debugShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+            glUniformMatrix3fv(m_debugShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
+            glUniformMatrix3fv(m_debugShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
+            mesh.drawBasic(m_debugShader);
 
-            //mesh.drawBasic(m_debugShader);
-
-            //// Draw the mesh again for each light / shading model.
-            //glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); // Enable color writes.
-            //glDepthMask(GL_FALSE); // Disable depth writes.
-            //glDepthFunc(GL_EQUAL); // Only draw a pixel if it's depth matches the value stored in the depth buffer.
-            //glEnable(GL_BLEND); // Enable blending.
-            //glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+            // Draw the mesh again for each light / shading model.
+            glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); // Enable color writes.
+            glDepthMask(GL_FALSE); // Disable depth writes.
+            glDepthFunc(GL_EQUAL); // Only draw a pixel if it's depth matches the value stored in the depth buffer.
+            glEnable(GL_BLEND); // Enable blending.
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
             GLuint PbrUBO;
 
@@ -182,20 +220,38 @@ void Application::update() {
             // Set up matrices and view position
             glUniformMatrix4fv(m_selShader->getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
             glUniformMatrix3fv(m_selShader->getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
+            glUniformMatrix3fv(m_selShader->getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
             glUniformMatrix4fv(m_selShader->getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
-            glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(selectedCamera->cameraPos()));
+            glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
 
             // Texture and material settings
             bool hasTexCoords = mesh.hasTextureCoords();
             m_texture.bind(hasTexCoords ? GL_TEXTURE0 : 0);
+
+            // PBR Material Texture
+            auto bindSlot = GL_TEXTURE10;
+            for (auto& pbrTexture : m_pbrTextures) {
+                pbrTexture.bind(bindSlot);
+                bindSlot++;
+            }
+
+            hasTexCoords = hasTexCoords && textureEnabled;
             glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), hasTexCoords);
             glUniform1i(m_selShader->getUniformLocation("colorMap"), hasTexCoords ? 0 : -1);
-            glUniform1i(m_selShader->getUniformLocation("useMaterial"), hasTexCoords ? GL_FALSE : m_useMaterial);
+            glUniform1i(m_selShader->getUniformLocation("useMaterial"),m_useMaterial);
 
             // Pass in shadow settings as UBO
             m_selShader->bindUniformBlock("shadowSetting", 2, shadowSettingUbo);
-            m_shadowTex.bind(GL_TEXTURE1);
-            glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
+
+            glBindVertexArray(mesh.getVao());
+                m_shadowTex.bind(GL_TEXTURE1);
+                glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
+            glBindVertexArray(0);
+
+            // Restore default depth test settings and disable blending.
+            glDepthFunc(GL_LEQUAL);
+            glDepthMask(GL_TRUE);
+            glDisable(GL_BLEND);
 
             // Generate UBOs and draw
             if (multiLightShadingEnabled) {
@@ -204,6 +260,12 @@ void Application::update() {
                 glUniform1i(m_selShader->getUniformLocation("LightCount"), static_cast<GLint>(lights.size()));
 
                 if (usePbrShading) {
+                    glUniform1i(m_selShader->getUniformLocation("normalMap"), true ? 10 : -1);
+                    glUniform1i(m_selShader->getUniformLocation("albedoMap"), true ? 11 : -1);
+                    glUniform1i(m_selShader->getUniformLocation("metallicMap"), true ? 12 : -1);
+                    glUniform1i(m_selShader->getUniformLocation("roughnessMap"), true ? 13 : -1);
+                    glUniform1i(m_selShader->getUniformLocation("aoMap"), true ? 14 : -1);
+
                     mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
                 }
                 else {
@@ -214,11 +276,6 @@ void Application::update() {
                 genUboBufferObj(*selectedLight, lightUBO); // Pass single Light
                 mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
             }
-
-            // Restore default depth test settings and disable blending.
-            //glDepthFunc(GL_LEQUAL);
-            //glDepthMask(GL_TRUE);
-            //glDisable(GL_BLEND);
 
             int lightsCnt = static_cast<int>(lights.size());
             glBindVertexArray(mesh.getVao());
@@ -254,38 +311,25 @@ void Application::imgui() {
     ImGui::Begin("Assignment 2 Demo");
 
     ImGui::Separator();
-    ImGui::Text("Cameras:");
+    ImGui::Text("Texture parameters");
 
-    std::vector<std::string> itemStrings;
-    for (size_t i = 0; i < cameras.size(); i++) {
-        itemStrings.push_back("Camera " + std::to_string(i));
-    }
+    ImGui::Checkbox("Enable Texture for model", &textureEnabled);
 
-    std::vector<const char*> itemCStrings;
-    for (const auto& string : itemStrings) {
-        itemCStrings.push_back(string.c_str());
-    }
-
-    int tempSelectedItem = static_cast<int>(curCameraIndex);
-    if (ImGui::ListBox("Cameras", &tempSelectedItem, itemCStrings.data(), (int)itemCStrings.size(), 4)) {
-        selectedCamera->setUserInteraction(false);
-        curCameraIndex = static_cast<size_t>(tempSelectedItem);
-        selectedCamera = &cameras.at(curCameraIndex);
-        selectedCamera->setUserInteraction(true);
-    }
-
-    selectedCamera = &cameras[curCameraIndex];
-    ImGui::Text("Selected Camera Index: %d", curCameraIndex);
-
-    // Button for clearing Camera
-    if (ImGui::Button("Reset Cameras")) {
-        //resetObjList(cameras,defaultLight);
+    ImGui::InputText("Texture Path:", &texturePath[0], texturePath.size() + 1);
+    if(ImGui::Button("Regenerate Texture")) {
+        try {
+            m_texture = Texture(RESOURCE_ROOT + texturePath);
+        }
+        catch (textureLoadingException e) {
+            std::cerr << e.what() << std::endl;
+        }
     }
 
     ImGui::Separator();
+
+    ImGui::Checkbox("Enable Material for model", &m_useMaterial);
+
     ImGui::Combo("Material Setting", &curMaterialIndex, materialModelNames.data(), static_cast<size_t>(MaterialModel::CNT));
-
-    ImGui::Separator();
     ImGui::Text("Material parameters");
 
     if (static_cast<MaterialModel>(curMaterialIndex) == MaterialModel::NORMAL) {
@@ -315,6 +359,36 @@ void Application::imgui() {
     ImGui::Text("Shadow modes");
     ImGui::Checkbox("Shadow Enabled", &shadowSettings.shadowEnabled);
     ImGui::Checkbox("PCF Enabled", &shadowSettings.pcfEnabled);
+
+
+    ImGui::Separator();
+    ImGui::Text("Cameras:");
+
+    std::vector<std::string> itemStrings;
+    for (size_t i = 0; i < cameras.size(); i++) {
+        itemStrings.push_back("Camera " + std::to_string(i));
+    }
+
+    std::vector<const char*> itemCStrings;
+    for (const auto& string : itemStrings) {
+        itemCStrings.push_back(string.c_str());
+    }
+
+    int tempSelectedItem = static_cast<int>(curCameraIndex);
+    if (ImGui::ListBox("Cameras", &tempSelectedItem, itemCStrings.data(), (int)itemCStrings.size(), 4)) {
+        selectedCamera->setUserInteraction(false);
+        curCameraIndex = static_cast<size_t>(tempSelectedItem);
+        selectedCamera = &cameras.at(curCameraIndex);
+        selectedCamera->setUserInteraction(true);
+    }
+
+    selectedCamera = &cameras[curCameraIndex];
+    ImGui::Text("Selected Camera Index: %d", curCameraIndex);
+
+    // Button for clearing Camera
+    if (ImGui::Button("Reset Cameras")) {
+        //resetObjList(cameras,defaultLight);
+    }
 
     ImGui::Separator();
     ImGui::Text("Lights");
@@ -360,8 +434,6 @@ void Application::imgui() {
         //resetObjList(lights,defaultLight);
     }
 
-    ImGui::Separator();
-    ImGui::Checkbox("Use material if no texture", &m_useMaterial);
     ImGui::End();
 }
 

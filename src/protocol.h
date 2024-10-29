@@ -31,6 +31,10 @@ DISABLE_WARNINGS_POP()
 inline const int WIDTH = 1200;
 inline const int HEIGHT = 800;
 
+struct textureLoadingException : public std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
 struct shadowLoadingException : public std::runtime_error {
     using std::runtime_error::runtime_error;
 };
@@ -191,6 +195,13 @@ void genUboBufferObj(std::vector<T>& objLists, GLuint& selUboBuffer, int maxObjL
 template <typename T>
 void genUboBufferObj(T& object, GLuint& selUboBuffer) {
     glGenBuffers(1, &selUboBuffer);
+
+    if (selUboBuffer == 0) {
+        // Handle error if buffer generation failed
+        std::cerr << "Error generating UBO" << std::endl;
+        return;
+    }
+
     glBindBuffer(GL_UNIFORM_BUFFER, selUboBuffer);
     glBufferData(GL_UNIFORM_BUFFER, sizeof(T), &object, GL_STATIC_DRAW);
     glBindBuffer(GL_UNIFORM_BUFFER, 0);

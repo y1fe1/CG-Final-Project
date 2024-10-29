@@ -1,6 +1,7 @@
 #pragma once
 
 #include "protocol.h"
+#include <framework/trackball.h>
 #define MAX_LIGHT_CNT 10
 
 class Application {
@@ -13,6 +14,7 @@ private:
     int curSpecularIndex = 0;
 
     Window m_window;
+    Trackball trackball;
 
     GLuint lightUBO;
 
@@ -27,10 +29,16 @@ private:
 
     std::vector<GPUMesh> m_meshes;
     Texture m_texture;
+    std::string texturePath;
+
+    std::vector<Texture> m_pbrTextures;
+
+    bool textureEnabled = false;
 
     Material m_Material;
     PBRMaterial m_PbrMaterial;
-    bool m_useMaterial{ true };
+    bool m_useMaterial = true;
+    bool m_materialChangedByUser = false;
 
     int curMaterialIndex = 0;
 

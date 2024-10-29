@@ -39,6 +39,8 @@ public:
     // Multiple meshes may be generated if there are multiple sub-meshes in the file
     static std::vector<GPUMesh> loadMeshGPU(std::filesystem::path filePath, bool normalize = false);
 
+    static std::vector<GPUMesh> loadMeshGPU(std::vector<Mesh> cpuMeshs);
+
     // Cannot copy a GPU mesh because it would require reference counting of GPU resources.
     GPUMesh& operator=(const GPUMesh&) = delete;
     GPUMesh& operator=(GPUMesh&&);
@@ -61,7 +63,7 @@ public:
 
     void drawBasic(const Shader& drawingShader);
 
-    void drawShadowMap(const Shader& shadowShader, glm::mat4 lightMVP, GLuint texShadowBuffer, const int SHADOWTEX_WIDTH, const int SHADOWTEX_HEIGHT);
+    void drawShadowMap(const Shader& shadowShader, glm::mat4 lightMVP, GLuint& texShadowBuffer, const int SHADOWTEX_WIDTH, const int SHADOWTEX_HEIGHT);
 
 private:
     void moveInto(GPUMesh&&);
