@@ -29,6 +29,8 @@ private:
 
     std::vector<GPUMesh> m_meshes;
     Texture m_texture;
+
+    char file_path_buffer[256];
     std::string texturePath;
 
     std::vector<Texture> m_pbrTextures;

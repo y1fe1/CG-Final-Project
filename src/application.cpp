@@ -315,9 +315,11 @@ void Application::imgui() {
 
     ImGui::Checkbox("Enable Texture for model", &textureEnabled);
 
-    ImGui::InputText("Texture Path:", &texturePath[0], texturePath.size() + 1);
+    std::strncpy(file_path_buffer, texturePath.c_str(), sizeof(file_path_buffer) - 1);
+    ImGui::InputText("Texture Path:", file_path_buffer, sizeof(file_path_buffer));
     if(ImGui::Button("Regenerate Texture")) {
         try {
+            texturePath = file_path_buffer;
             m_texture = Texture(RESOURCE_ROOT + texturePath);
         }
         catch (textureLoadingException e) {
