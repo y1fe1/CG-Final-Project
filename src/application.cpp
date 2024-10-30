@@ -101,6 +101,7 @@ void Application::update() {
         if (usePostProcess) {
             // 绑定自定义的帧缓冲对象
             glBindFramebuffer(GL_FRAMEBUFFER, framebufferPostProcess);
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         }
         else {
@@ -108,7 +109,6 @@ void Application::update() {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             //glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
         }
-
 
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
         glClearDepth(1.0);
@@ -174,10 +174,12 @@ void Application::update() {
 
         if (usePostProcess) {
             // 绑定默认帧缓冲对象，将结果绘制到屏幕
+
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             runPostProcess();
+            glFinish();
         }
-        glClear(GL_COLOR_BUFFER_BIT);
+
         m_window.swapBuffers();
     }
 }
@@ -446,11 +448,11 @@ void Application::initPostProcess() {
     glBindFramebuffer(GL_FRAMEBUFFER, framebufferPostProcess);
 
     // 创建颜色纹理附件
-    glActiveTexture(GL_TEXTURE1); // 激活 GL_TEXTURE1
+    //glActiveTexture(GL_TEXTURE1); // 激活 GL_TEXTURE1
     glGenTextures(1, &texturePostProcess);
     glBindTexture(GL_TEXTURE_2D, texturePostProcess);
     //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WIDTH, HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SHADOWTEX_WIDTH, SHADOWTEX_WIDTH, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WINDOW_WIDTH, WINDOW_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texturePostProcess, 0);
@@ -459,7 +461,7 @@ void Application::initPostProcess() {
     glGenRenderbuffers(1, &depthbufferPostProcess);
     glBindRenderbuffer(GL_RENDERBUFFER, depthbufferPostProcess);
     //glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WIDTH, HEIGHT);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, SHADOWTEX_WIDTH, SHADOWTEX_WIDTH);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WINDOW_WIDTH, WINDOW_HEIGHT);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthbufferPostProcess);
 
     // 检查帧缓冲对象是否完整
@@ -468,47 +470,34 @@ void Application::initPostProcess() {
 
     // 解绑帧缓冲对象，防止意外修改
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glBindTexture(GL_TEXTURE_2D, 0); // 解绑纹理
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 
-
-//void Application::runPostProcess() {
-//    // 使用后期处理着色器
-//    m_postProcessShader.bind();
-//
-//    // 激活并绑定纹理单元
-//    glActiveTexture(GL_TEXTURE1);
-//    glBindTexture(GL_TEXTURE_2D, texturePostProcess); // 绑定自定义帧缓冲对象的颜色纹理附件
-//
-//    // 设置着色器中的采样器
-//    glUniform1i(m_postProcessShader.getUniformLocation("scene"), 1);
-//
-//    // 渲染全屏四边形，应用后期处理效果
-//    renderFullScreenQuad();
-//}
 void Application::runPostProcess() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     // 使用后期处理着色器
     m_postProcessShader.bind();
 
     // 激活并绑定纹理单元
-    glActiveTexture(GL_TEXTURE1);
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texturePostProcess); // 绑定自定义帧缓冲对象的颜色纹理附件
 
     // 设置着色器中的采样器
-    glUniform1i(m_postProcessShader.getUniformLocation("scene"), 1);
+    glUniform1i(m_postProcessShader.getUniformLocation("scene"), 0);
 
+
+    glDisable(GL_DEPTH_TEST);
     // 渲染全屏四边形，应用后期处理效果
     renderFullScreenQuad();
+    glEnable(GL_DEPTH_TEST);
 
 }
 
 void Application::renderFullScreenQuad() {
     static unsigned int quadVAO = 0;
     static unsigned int quadVBO;
-    //glViewport(0, 0, WIDTH, HEIGHT);
-    glViewport(0, 0, SHADOWTEX_WIDTH, SHADOWTEX_WIDTH);
+    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
     if (quadVAO == 0) {
         float quadVertices[] = {

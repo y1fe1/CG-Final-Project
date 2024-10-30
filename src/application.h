@@ -58,6 +58,8 @@ private:
     GLuint framebufferPostProcess;
     GLuint texturePostProcess;
     GLuint depthbufferPostProcess;
+    const int WINDOW_WIDTH = 1024;
+    const int WINDOW_HEIGHT = 1024;
 
 public:
     Application();
