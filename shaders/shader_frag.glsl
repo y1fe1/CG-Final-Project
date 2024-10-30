@@ -48,10 +48,13 @@ uniform vec3 ambientColor;
 
 uniform mat3 normalModelMatrix;
 
+//Env Mapping
+uniform samplerCube SkyBox;
+uniform bool useEnvMap;
+
 in vec3 fragPosition;
 in vec3 fragNormal;
 in vec2 fragTexCoord;
-
 
 layout(location = 0) out vec4 fragColor;
 
@@ -117,26 +120,42 @@ void main()
 
     // Shadow map coordinates (XY)
     vec2 shadowMapCoord = fragLightCoord.xy;
+    float shadowFactor = (shadowEnabled)? shadowFactorCal(shadowMapCoord,fragLightDepth) : 0.0f;
 
     vec3 Specular = vec3(0.0f);
 
     vec3 normal = normalize(fragNormal);
 
     vec3 viewDir = normalize(viewPos - fragPosition);
-    vec3 lightDir = normalModelMatrix * normalize(position - fragPosition);
+    vec3 lightDir = normalize(position - fragPosition);
 
     vec3 reflectDir = reflect(-lightDir, normal);
     vec3 halfDir = normalize(lightDir + viewDir);
 
     float lambert = max(dot(normal,lightDir),0.0);
     //vec3 ambient = ambientColor;
-
-    float shadowFactor = (shadowEnabled)? shadowFactorCal(shadowMapCoord,fragLightDepth) : 0.0f;
     
+    vec3 finalColor = vec3(0.0f);
+
+    //texColor
     vec4 texColor = vec4(0.0f);
 
     if (hasTexCoords)       {
-       texColor = texture(colorMap, fragTexCoord);
+       texColor = texture(colorMap, fragTexCoord); 
+    }
+
+    // Env Mapping
+    vec3 envReflectDir = vec3(0.0f);
+    vec3 envColor = vec3(0.0f);
+    vec3 finalEnvColor = vec3(0.0f);
+
+    if (useEnvMap)  {
+        // Environment mapping with reflection
+        envReflectDir = reflect(-viewDir, normal); // Reflection vector for env mapping
+        envColor = texture(SkyBox, envReflectDir).rgb;
+
+        // Combine environment color with material color
+        finalEnvColor = (hasTexCoords) ? envColor * texColor.rgb : envColor;
     }
 
     if (useMaterial)   { 
@@ -145,7 +164,7 @@ void main()
         vec3 diffuse = (hasTexCoords)? lambert*kd*texColor.rgb : lambert*kd;
         
         //basic blinn-phong model
-        if(lambert > 0.0) {
+        if(lambert >= 0.0) {
             Specular = ks * pow(max(dot(halfDir,normal), 0.0f), shininess);
             Specular = (hasTexCoords)? texColor.rgb * Specular : Specular;
         }
@@ -157,13 +176,30 @@ void main()
         //vec3 finalColor = (diffuse + Specular);
         //vec3 finalColor = diffuse;
         //vec3 finalColor = Specular;
-        vec3 finalColor = Specular + color * diffuse;
+        finalColor = Specular + color * diffuse;
 
-        fragColor = vec4(finalColor * (1-shadowFactor) * lightAttenuationFactor, 1);
-
+        finalColor = finalColor * (1-shadowFactor) * lightAttenuationFactor;
     }
-    else { 
-        fragColor = (hasTexCoords)? texColor :vec4(normal, 1); 
+
+    float reflectionStrength = 1.0f;
+
+    if (useMaterial && useEnvMap) {
+        // Blend material shading with environment map for a reflective effect
+        fragColor = vec4(mix(finalColor, finalEnvColor, reflectionStrength), 1.0);
+    }
+    else if (useMaterial) {
+        // Only material shading
+        fragColor = vec4(finalColor, 1.0);
+    }
+    else if (useEnvMap) {
+        // Only environment mapping
+        fragColor = vec4(envColor, 1.0);
+    }
+    else if (hasTexCoords) {
+        // Fallback: use texture color only if available
+        fragColor = texColor;
+    } else { 
+        fragColor = vec4(normal, 1); 
     } // Output color value, change from (1, 0, 0) to something else
 }
 

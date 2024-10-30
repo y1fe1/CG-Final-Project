@@ -55,6 +55,10 @@ uniform bool useMaterial;
 
 uniform vec3 ambientColor;
 
+//Env Mapping
+uniform samplerCube SkyBox;
+uniform bool useEnvMap;
+
 in vec3 fragPosition;
 in vec3 fragNormal;
 in vec2 fragTexCoord;
@@ -119,12 +123,30 @@ void main()
 
     vec3 LightIntensity = vec3(0.0f);
 
+    vec3 finalColor;
     vec4 texColor = vec4(0.0f);
+
+
+    // Env Mapping
+    vec3 envReflectDir = vec3(0.0f);
+    vec3 envColor = vec3(0.0f);
+    vec3 finalEnvColor = vec3(0.0f);
+
     if (hasTexCoords)       { 
          texColor = texture(colorMap, fragTexCoord);
     }
 
-    if (useMaterial)   
+    if (useEnvMap)  {
+        // Environment mapping with reflection
+        envReflectDir = reflect(-viewDir, normal); // Reflection vector for env mapping
+        envColor = texture(SkyBox, envReflectDir).rgb;
+
+        // Combine environment color with material color
+        finalEnvColor = (hasTexCoords) ? envColor * texColor.rgb : envColor;
+        fragColor = vec4(envColor, 1.0);
+    }
+    
+    else if (useMaterial)   
     { 
         for (int idx = 0; idx < LightCount; idx++){
 
@@ -153,7 +175,7 @@ void main()
             vec3 diffuse = (hasTexCoords)? lambert*kd*texColor.rgb : lambert*kd;
         
             //basic phong model
-            if(lambert > 0.0f) {
+            if(lambert >= 0.0f) {
                 Specular = ks * pow(max(dot(halfDir, normal), 0.0f), shininess);
                 Specular = (hasTexCoords)? texColor.rgb * Specular : Specular;
             }
@@ -162,11 +184,12 @@ void main()
             float lightAttenuationFactor = getLightAttenuationFactor(lightDir);
 
             //vec3 finalColor = (ambient + diffuse + Specular);
-            vec3 finalColor = (diffuse + Specular) * LightList[idx].color * (1-shadowFactor) * lightAttenuationFactor;
+            finalColor = (diffuse + Specular) * LightList[idx].color * (1-shadowFactor) * lightAttenuationFactor;
             //vec3 finalColor = diffuse;
-            fragColor += vec4(finalColor, 1);
+            fragColor += vec4(finalColor, 1.0);
         }
     }
+
     else  { 
          fragColor = (hasTexCoords)? texColor :vec4(normal, 1);     
     } // Output color value, change from (1, 0, 0) to something else
