@@ -5,7 +5,7 @@
 Application::Application()
     : m_window("Final Project", glm::ivec2(1024, 1024), OpenGLVersion::GL41)
     , texturePath("resources/texture/wall.jpg")
-    , m_texture(RESOURCE_ROOT "resources/texture/wall.jpg")
+    , m_texture(RESOURCE_ROOT "resources/texture/checkerboard.png")
     , m_projectionMatrix(glm::perspective(glm::radians(80.0f), m_window.getAspectRatio(), 0.1f, 30.0f))
     , m_viewMatrix(glm::lookAt(glm::vec3(-1, 1, -1), glm::vec3(0), glm::vec3(0, 1, 0)))
     , m_modelMatrix(1.0f)
@@ -15,12 +15,14 @@ Application::Application()
     }
     ,
     // init PBR material
-    m_PbrMaterial{ glm::vec3{ 0.8, 0.6, 0.4 }, 1.0f, 0.2f, 1.0f },
+    m_PbrMaterial{ glm::vec3{ 0.8, 0.6, 0.4 }, 1.0f, 0.2f, 1.0f }
 
     //init skyboxTex
-    skyboxTexture(faces),
-
-    trackball{ &m_window, glm::radians(50.0f) }
+    , skyboxTexture(faces)
+    //init hdrTex and hdr cubemap
+    , hdrTextureMap(hdrSamplePath)
+    , hdrCubeMap(RENDER_HDR_CUBE_MAP)
+    , trackball{ &m_window, glm::radians(50.0f) }
 {
     //Camera defaultCamera = Camera(&m_window);
 
@@ -76,13 +78,16 @@ Application::Application()
         });
 
     // === Create SkyBox Vertices ===
+
+    glEnable(GL_DEPTH_TEST);
+
     try {
         glGenVertexArrays(1, &skyboxVAO);
         glGenBuffers(1, &skyboxVBO);
         glBindVertexArray(skyboxVAO);
 
         glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices, GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
 
         // Set vertex attribute pointers
         glEnableVertexAttribArray(0);
@@ -95,6 +100,60 @@ Application::Application()
         std::cerr << e.what() << std::endl;
     }
 
+    // === Create HDR FrameBuffer ===
+    glDepthFunc(GL_LEQUAL);
+
+    try {
+        glGenFramebuffers(1, &captureFBO);
+        glGenRenderbuffers(1, &captureRBO);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 1024, 1024);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+
+        // initialize hdrTexMap should be here
+
+        // init cube to render hdr map
+    
+        ShaderBuilder hdrToCubeMapShaderBuilder;
+        hdrToCubeMapShaderBuilder
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/hdr_to_cube_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_to_cube_frag.glsl");
+        m_hdrToCubeShader = hdrToCubeMapShaderBuilder.build();
+
+        m_hdrToCubeShader.bind();
+        glUniformMatrix4fv(m_hdrToCubeShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(captureProjection));
+
+        hdrTextureMap.bind(GL_TEXTURE0);
+        glUniform1i(m_hdrToCubeShader.getUniformLocation("equirectangularMap"), 0);
+
+        glViewport(0, 0, 1024, 1024);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        for (GLuint i = 0; i < 6; ++i) 
+        {
+            glUniformMatrix4fv(m_hdrToCubeShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(captureViews[i]));
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, hdrCubeMap.getTextureRef(), 0);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            renderHDRCubeMap(cubeVAO, cubeVBO, hdrMapVertices, 288);
+        }   
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    }
+
+    catch (std::runtime_error e) {
+        std::cerr << e.what() << std::endl;
+    }
+
+    // then before rendering, configure the viewport to the original framebuffer's screen dimensions
+    glm::ivec2 windowSizes = m_window.getWindowSize();
+    glViewport(0, 0, windowSizes.x, windowSizes.y);
+
+
+
+    // === Create Material Texture if its valid path ===
     std::string textureFullPath = std::string(RESOURCE_ROOT) + texturePath;
     std::vector<Mesh> cpuMeshes = loadMesh(RESOURCE_ROOT "resources/sphere.obj");
 
@@ -108,6 +167,8 @@ Application::Application()
     //m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/sphere.obj");
     m_meshes = GPUMesh::loadMeshGPU(cpuMeshes);  // load mesh from mesh list so we have more freedom on setting up each mesh
 
+
+    // ===  Create All Shader ===
     try {
         ShaderBuilder debugShader;
         debugShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/shader_vert.glsl");
@@ -147,6 +208,11 @@ Application::Application()
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/skybox_frag.glsl");
         m_skyBoxShader = skyBoxBuilder.build();
 
+        ShaderBuilder hdrSkyBoxBuilder;
+        hdrSkyBoxBuilder
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/skybox_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_skybox_frag.glsl");
+        m_hdrSkyBoxShader = hdrSkyBoxBuilder.build();
     }
     catch (ShaderLoadingException e) {
         std::cerr << e.what() << std::endl;
@@ -169,24 +235,24 @@ void Application::update() {
 
         this->imgui();
 
-        selectedCamera->updateInput();
+        //selectedCamera->updateInput();
+        m_viewMatrix = selectedCamera->viewMatrix();
 
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 
-        glClearDepth(1.0);
+        //glClearDepth(1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glDisable(GL_CULL_FACE);
+        //glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
+ 
+        const glm::vec3 cameraPos = trackball.position();
+        //const glm::vec3 cameraPos = selectedCamera->cameraPos();
+        const glm::mat4 model{ 1.0f };
 
-        m_viewMatrix = selectedCamera->viewMatrix();
-
-        //const glm::vec3 cameraPos = trackball.position();
-        const glm::vec3 cameraPos = selectedCamera->cameraPos();
-        /*const glm::mat4 model{ 1.0f };
-
+        //const glm::mat4 view = m_viewMatrix;
         const glm::mat4 view = trackball.viewMatrix();
-        const glm::mat4 projection = trackball.projectionMatrix();*/
+        const glm::mat4 projection = trackball.projectionMatrix();
 
         glm::mat4 lightMVP;
         GLfloat near_plane = 0.5f, far_plane = 30.0f;
@@ -194,18 +260,20 @@ void Application::update() {
         glm::mat4 lightViewMatrix = glm::lookAt(selectedLight->position, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         lightMVP = mainProjectionMatrix * lightViewMatrix;
 
-        //glm::mat4 mvpMatrix = projection * view * model;
-        const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
+        glm::mat4 mvpMatrix = projection * view * model;
+        //const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
         const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(m_modelMatrix));
 
+        // Actualy Mesh Render Loop
+        #pragma region Mesh render loop
         for (GPUMesh& mesh : m_meshes) {
             //shadow maps generates the shadows
-#pragma region shadow Map Genereates
-            if (TRUE)
-            {
-                mesh.drawShadowMap(m_shadowShader, lightMVP, m_shadowTex.getFramebuffer(), SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
-            }
-#pragma endregion
+        #pragma region shadow Map Genereates
+                    if (FALSE)
+                    {
+                        mesh.drawShadowMap(m_shadowShader, lightMVP, m_shadowTex.getFramebuffer(), SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
+                    }
+        #pragma endregion
 
             // set new Material every time it is updated
             GLuint newUBOMaterial;
@@ -284,7 +352,7 @@ void Application::update() {
             //glDisable(GL_BLEND);
 
 
-            if (envMapEnabled) {
+            if (envMapEnabled && hdrMapEnabled) {
                 glBindVertexArray(mesh.getVao());
                 skyboxTexture.bind(GL_TEXTURE20);
                 glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -342,23 +410,40 @@ void Application::update() {
 
             mesh.drawBasic(m_lightShader);
         }
+#pragma endregion
 
         // Render Enviroment Mapping at the end
-        if (envMapEnabled) {
-            glDepthFunc(GL_LEQUAL);
+        if (hdrMapEnabled) {
 
-            m_skyBoxShader.bind();
             glm::mat4 viewModel = glm::mat4(glm::mat3(view));
-            //glm::mat4 projection = glm::perspective(glm::radians(80.0f), float(WIDTH)/float(HEIGHT), 0.1f, 100.0f);
-            glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(viewModel));
-            glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
-            glBindVertexArray(skyboxVAO);
-            skyboxTexture.bind(GL_TEXTURE0);
+            glDepthFunc(GL_LEQUAL);
+            if (hdrMapEnabled) {
+                m_hdrSkyBoxShader.bind();
+                glUniformMatrix4fv(m_hdrSkyBoxShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(viewModel));
+                glUniformMatrix4fv(m_hdrSkyBoxShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
-            glUniform1i(m_skyBoxShader.getUniformLocation("skybox"), 0);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-            glBindVertexArray(0);
+                hdrCubeMap.bind(GL_TEXTURE0);
+                glUniform1i(m_hdrSkyBoxShader.getUniformLocation("hdrEnvMap"), 0);
+
+                renderHDRCubeMap(cubeVAO, cubeVBO, hdrMapVertices, 288);
+            } 
+            else {
+
+                m_skyBoxShader.bind();
+
+                //glm::mat4 projection = glm::perspective(glm::radians(80.0f), float(WIDTH)/float(HEIGHT), 0.1f, 100.0f);
+                glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(viewModel));
+                glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+                glBindVertexArray(skyboxVAO);
+                skyboxTexture.bind(GL_TEXTURE0);
+
+                glUniform1i(m_skyBoxShader.getUniformLocation("skybox"), 0);
+                glDrawArrays(GL_TRIANGLES, 0, 36);
+                glBindVertexArray(0);
+            }
+
             glDepthFunc(GL_LESS);
         }
         m_window.swapBuffers();
@@ -372,6 +457,7 @@ void Application::imgui() {
 
     ImGui::Text("Environment Map parameters");
     ImGui::Checkbox("Enable Environment Map", &envMapEnabled); // only for single light now
+    ImGui::Checkbox("Enable HDR Environment", &hdrMapEnabled);
 
     ImGui::Separator();
     ImGui::Text("Texture parameters");

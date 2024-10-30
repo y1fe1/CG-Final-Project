@@ -20,7 +20,9 @@ add_executable(Master_TechDemo
 	"src/main.cpp" 
 	"src/cubeMapTexture.cc"
 	"src/cubeMapTexture.h"
- )
+	"src/hdrTexture.cc"
+	"src/hdrTexture.h"
+)
 
 target_compile_definitions(Master_TechDemo PRIVATE RESOURCE_ROOT="${CMAKE_CURRENT_LIST_DIR}/")
 target_compile_features(Master_TechDemo PRIVATE cxx_std_20)

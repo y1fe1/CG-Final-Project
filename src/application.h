@@ -5,6 +5,7 @@
 
 #include "camera.h"
 #include "cubeMapTexture.h"
+#include "hdrTexture.h"
 
 #define MAX_LIGHT_CNT 10
 
@@ -31,7 +32,7 @@ private:
     Shader m_shadowShader;
     Shader m_lightShader;
 
-    // SkyBox 
+    // Definition for SkyBox 
     bool envMapEnabled = false;
 
     // faces should follow this format
@@ -48,6 +49,20 @@ private:
     GLuint skyboxVAO,skyboxVBO;
 
     Shader m_skyBoxShader;
+
+    // Definition HDR cubemap settings
+    bool hdrMapEnabled = false;
+
+    GLuint captureFBO, captureRBO; // framebuffers
+
+    std::filesystem::path hdrSamplePath{ RESOURCE_ROOT HDR_PATH "warm_restaurant_night_4k.hdr" };
+    hdrTexture hdrTextureMap;
+
+    cubeMapTex hdrCubeMap;
+    GLuint cubeVAO = 0, cubeVBO = 0;
+
+    Shader m_hdrToCubeShader;
+    Shader m_hdrSkyBoxShader;
 
     // Definition for model Obejcts includeing texture and Material
     std::vector<GPUMesh> m_meshes;
@@ -67,7 +82,7 @@ private:
 
     int curMaterialIndex = 0;
 
-    //
+    // mvp matrices
 
     glm::mat4 m_projectionMatrix;
     glm::mat4 m_viewMatrix;

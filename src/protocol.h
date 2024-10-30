@@ -32,20 +32,6 @@ struct textureLoadingException : public std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
-struct shadowLoadingException : public std::runtime_error {
-    using std::runtime_error::runtime_error;
-};
-
-struct shadowSetting {
-    alignas(4) bool shadowEnabled = 0;  // 4 bytes
-    alignas(4) bool pcfEnabled = 0;     // 4 bytes
-    alignas(4) bool _UNUSE_PADDING0 = 0; // Additional 8 bytes for 16-byte alignment
-    alignas(4) bool _UNUSE_PADDING1 = 0;
-};
-
-inline const int MAXLIGHT = 10;
-inline size_t curLightIndex = 0;
-
 struct PBRMaterial {
     glm::vec3 albedo;
     float metallic;
@@ -72,6 +58,8 @@ enum class MaterialModel {
 
 inline std::array<const char*, 2> materialModelNames{ "normal","PBR Material" };
 
+
+    #pragma region LightRelated
 struct Light {
     glm::vec3 position;
     float _UNUSE_PADDING0;
@@ -108,7 +96,24 @@ struct Light {
     //std::shared_ptr<Texture> texture; light Texture not used yet
 };
 
+inline const int MAXLIGHT = 10;
+inline size_t curLightIndex = 0;
+
 inline Light defaultLight = { glm::vec3(0, 0, 3), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/};
+
+#pragma endregion
+
+    #pragma region ShadowRelated
+struct shadowLoadingException : public std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+struct shadowSetting {
+    alignas(4) bool shadowEnabled = 0;  // 4 bytes
+    alignas(4) bool pcfEnabled = 0;     // 4 bytes
+    alignas(4) bool _UNUSE_PADDING0 = 0; // Additional 8 bytes for 16-byte alignment
+    alignas(4) bool _UNUSE_PADDING1 = 0;
+};
 
 struct ShadowTexture {
 public:
@@ -165,6 +170,7 @@ private:
     GLuint m_texture{ INVALID };
     GLuint m_frameBuffer{ INVALID };
 };
+#pragma endregion
 
 
 
@@ -230,3 +236,29 @@ inline const std::unordered_map<std::string, Material*> materials = {
 inline std::vector<std::string> materialNames; // To store material names for ComboBox
 inline int selectedMaterialIndex = 0; // Index of the selected material
 
+inline void renderHDRCubeMap(GLuint& cubeVAO, GLuint& cubeVBO, const float* vertices, size_t vertexCount) {
+
+    // init if nessccary
+    if (cubeVAO == 0)
+    {
+        glGenVertexArrays(1, &cubeVAO);
+        glGenBuffers(1, &cubeVBO);
+        // fill buffer
+        glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * sizeof(vertices), vertices, GL_STATIC_DRAW);
+        // link vertex attributes
+        glBindVertexArray(cubeVAO);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+    }
+    // render Cube
+    glBindVertexArray(cubeVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glBindVertexArray(0);
+}

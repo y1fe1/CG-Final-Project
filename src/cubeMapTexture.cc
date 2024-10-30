@@ -49,8 +49,38 @@ cubeMapTex::cubeMapTex(std::vector<std::filesystem::path> filePaths)
     glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 }
 
+// this constructor is designed to create envCubeMap use to render HDR Map on it
+cubeMapTex::cubeMapTex(bool renderCubeMap)
+{
+    assert(renderCubeMap == RENDER_HDR_CUBE_MAP); // make sure you know you are rendering a HDR_CUBE_MAP
+
+    // Create a texture on the GPU and bind it for parameter setting
+    glGenTextures(1, &m_texture);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_texture);
+
+    for (GLuint i = 0; i < 6; ++i) 
+    {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
+            1024, 1024, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+}
+
 void cubeMapTex::bind(GLint textureSlot)
 {
     glActiveTexture(textureSlot);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_texture);
+}
+
+GLuint& cubeMapTex::getTextureRef()
+{
+    // TODO: insert return statement here
+    return m_texture;
 }
