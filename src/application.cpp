@@ -217,23 +217,23 @@ void Application::update() {
             GLuint shadowSettingUbo;
             genUboBufferObj(shadowSettings, shadowSettingUbo);
 
-            // Draw mesh into depth buffer but disable color writes.
-            glDepthMask(GL_TRUE);
-            glDepthFunc(GL_LEQUAL);
-            glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+            //// Draw mesh into depth buffer but disable color writes.
+            //glDepthMask(GL_TRUE);
+            //glDepthFunc(GL_LEQUAL);
+            //glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 
-            m_debugShader.bind();
-            glUniformMatrix4fv(m_debugShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
-            glUniformMatrix3fv(m_debugShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
-            glUniformMatrix4fv(m_debugShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
-            mesh.drawBasic(m_debugShader);
+            //m_debugShader.bind();
+            //glUniformMatrix4fv(m_debugShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+            //glUniformMatrix3fv(m_debugShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
+            //glUniformMatrix4fv(m_debugShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
+            //mesh.drawBasic(m_debugShader);
 
-            // Draw the mesh again for each light / shading model.
-            glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); // Enable color writes.
-            glDepthMask(GL_FALSE); // Disable depth writes.
-            glDepthFunc(GL_EQUAL); // Only draw a pixel if it's depth matches the value stored in the depth buffer.
-            glEnable(GL_BLEND); // Enable blending.
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+            //// Draw the mesh again for each light / shading model.
+            //glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); // Enable color writes.
+            //glDepthMask(GL_FALSE); // Disable depth writes.
+            //glDepthFunc(GL_EQUAL); // Only draw a pixel if it's depth matches the value stored in the depth buffer.
+            //glEnable(GL_BLEND); // Enable blending.
+            //glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
             GLuint PbrUBO;
 
@@ -278,10 +278,20 @@ void Application::update() {
                 glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
             glBindVertexArray(0);
 
-            // Restore default depth test settings and disable blending.
-            glDepthFunc(GL_LEQUAL);
-            glDepthMask(GL_TRUE);
-            glDisable(GL_BLEND);
+            //// Restore default depth test settings and disable blending.
+            //glDepthFunc(GL_LEQUAL);
+            //glDepthMask(GL_TRUE);
+            //glDisable(GL_BLEND);
+
+
+            if (envMapEnabled) {
+                glBindVertexArray(mesh.getVao());
+                skyboxTexture.bind(GL_TEXTURE20);
+                glDrawArrays(GL_TRIANGLES, 0, 36);
+                glUniform1i(m_selShader->getUniformLocation("SkyBox"), 20);
+                glUniform1i(m_selShader->getUniformLocation("useEnvMap"), envMapEnabled);
+                glBindVertexArray(0);
+            }
 
             // Generate UBOs and draw
             if (multiLightShadingEnabled) {
@@ -306,22 +316,6 @@ void Application::update() {
                 genUboBufferObj(*selectedLight, lightUBO); // Pass single Light
                 mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
             }
-
-            glDepthFunc(GL_LEQUAL);
-
-            m_skyBoxShader.bind();
-            glm::mat4 view = glm::mat4(glm::mat3(m_viewMatrix));
-            glm::mat4 projection = glm::perspective(glm::radians(80.0f), m_window.getAspectRatio(), 0.1f, 100.0f);
-            glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(view));
-            glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
-
-            glBindVertexArray(skyboxVAO);
-            skyboxTexture.bind(GL_TEXTURE20);
-
-            glUniform1i(m_skyBoxShader.getUniformLocation("skybox"), 20);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-            glBindVertexArray(0);
-            glDepthFunc(GL_LESS);
 
             int lightsCnt = static_cast<int>(lights.size());
             glBindVertexArray(mesh.getVao());
@@ -349,12 +343,35 @@ void Application::update() {
             mesh.drawBasic(m_lightShader);
         }
 
+        // Render Enviroment Mapping at the end
+        if (envMapEnabled) {
+            glDepthFunc(GL_LEQUAL);
+
+            m_skyBoxShader.bind();
+            glm::mat4 viewModel = glm::mat4(glm::mat3(view));
+            //glm::mat4 projection = glm::perspective(glm::radians(80.0f), float(WIDTH)/float(HEIGHT), 0.1f, 100.0f);
+            glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(viewModel));
+            glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+            glBindVertexArray(skyboxVAO);
+            skyboxTexture.bind(GL_TEXTURE0);
+
+            glUniform1i(m_skyBoxShader.getUniformLocation("skybox"), 0);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+            glBindVertexArray(0);
+            glDepthFunc(GL_LESS);
+        }
         m_window.swapBuffers();
     }
 }
 
 void Application::imgui() {
     ImGui::Begin("Assignment 2 Demo");
+
+    ImGui::Separator();
+
+    ImGui::Text("Environment Map parameters");
+    ImGui::Checkbox("Enable Environment Map", &envMapEnabled); // only for single light now
 
     ImGui::Separator();
     ImGui::Text("Texture parameters");

@@ -32,6 +32,7 @@ private:
     Shader m_lightShader;
 
     // SkyBox 
+    bool envMapEnabled = false;
 
     // faces should follow this format
     std::vector<std::filesystem::path> faces = {

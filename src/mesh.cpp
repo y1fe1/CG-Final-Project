@@ -109,11 +109,11 @@ bool GPUMesh::hasTextureCoords() const
     return m_hasTextureCoords;
 }
 
-GLuint GPUMesh::getVao(){
+GLuint& GPUMesh::getVao(){
     return m_vao;
 }
 
-GLuint GPUMesh::getShadowVao()
+GLuint& GPUMesh::getShadowVao()
 {
     return m_shadowVao;
 }

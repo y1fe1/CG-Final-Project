@@ -48,8 +48,8 @@ public:
     bool hasTextureCoords() const;
 
     // Define new Getter here
-    GLuint getVao();
-    GLuint getShadowVao();
+    GLuint& getVao();
+    GLuint& getShadowVao();
 
     // Define new Setter here
     void setUBOMaterial(GLuint newUboMaterial);

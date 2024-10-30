@@ -13,7 +13,7 @@ cubeMapTex::cubeMapTex(std::vector<std::filesystem::path> filePaths)
     glGenTextures(1, &m_texture);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_texture);
 
-    for (int i = 0; i < filePaths.size(); ++i) {
+    for (GLuint i = 0; i < filePaths.size(); ++i) {
 
         try {
             auto filePath = filePaths[i];
@@ -45,6 +45,8 @@ cubeMapTex::cubeMapTex(std::vector<std::filesystem::path> filePaths)
             std::cerr << e.what() << std::endl;
         }
     }
+
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 }
 
 void cubeMapTex::bind(GLint textureSlot)
