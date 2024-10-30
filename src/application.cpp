@@ -426,22 +426,7 @@ void Application::drawCameraPositionOnMinimap(const glm::vec4& cameraPosInMinima
     glEnable(GL_DEPTH_TEST);
 }
 
-//void Application::initPostProcess() {
-//
-//    glBindFramebuffer(GL_FRAMEBUFFER, framebufferPostProcess);
-//
-//    glGenTextures(1, &texturePostProcess);
-//    glBindTexture(GL_TEXTURE_2D, texturePostProcess);
-//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WIDTH, HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-//    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texturePostProcess, 0);
-//
-//    glGenRenderbuffers(1, &depthbufferPostProcess);
-//    glBindRenderbuffer(GL_RENDERBUFFER, depthbufferPostProcess);
-//    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WIDTH, HEIGHT);
-//    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthbufferPostProcess);
-//
-//}
-// 在构造函数或初始化函数中
+// 在构造函数中
 void Application::initPostProcess() {
     // 创建帧缓冲对象
     glGenFramebuffers(1, &framebufferPostProcess);
