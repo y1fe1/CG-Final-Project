@@ -76,6 +76,13 @@ Application::Application()
         pointShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/border_frag.glsl");
         m_pointShader = pointShader.build();
 
+
+        ShaderBuilder postProcessShader;
+        postProcessShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/postProcess_vert.glsl");
+        postProcessShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/postProcess_frag.glsl");
+        m_postProcessShader = postProcessShader.build();
+
+        initPostProcess();
     }
     catch (ShaderLoadingException e) {
         std::cerr << e.what() << std::endl;
@@ -90,6 +97,18 @@ void Application::update() {
 
         selectedCamera->updateInput();
         m_viewMatrix = selectedCamera->viewMatrix();
+
+        if (usePostProcess) {
+            // 绑定自定义的帧缓冲对象
+            glBindFramebuffer(GL_FRAMEBUFFER, framebufferPostProcess);
+            //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        }
+        else {
+            // 绑定默认帧缓冲对象（屏幕）
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            //glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
+        }
+
 
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
         glClearDepth(1.0);
@@ -153,6 +172,12 @@ void Application::update() {
             mesh.drawBasic(m_lightShader);
         }
 
+        if (usePostProcess) {
+            // 绑定默认帧缓冲对象，将结果绘制到屏幕
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            runPostProcess();
+        }
+        glClear(GL_COLOR_BUFFER_BIT);
         m_window.swapBuffers();
     }
 }
@@ -190,6 +215,7 @@ void Application::imgui() {
     ImGui::DragFloat3("P2", &selectedCamera->P2.x);
     ImGui::DragFloat3("P3", &selectedCamera->P3.x);
 
+    ImGui::Checkbox("usePostProcess", &usePostProcess);
     // Button for clearing Camera
     if (ImGui::Button("Reset Cameras")) {
         //resetObjList(cameras,defaultLight);
@@ -396,4 +422,123 @@ void Application::drawCameraPositionOnMinimap(const glm::vec4& cameraPosInMinima
     glDeleteVertexArrays(1, &pointVAO);
 
     glEnable(GL_DEPTH_TEST);
+}
+
+//void Application::initPostProcess() {
+//
+//    glBindFramebuffer(GL_FRAMEBUFFER, framebufferPostProcess);
+//
+//    glGenTextures(1, &texturePostProcess);
+//    glBindTexture(GL_TEXTURE_2D, texturePostProcess);
+//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WIDTH, HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+//    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texturePostProcess, 0);
+//
+//    glGenRenderbuffers(1, &depthbufferPostProcess);
+//    glBindRenderbuffer(GL_RENDERBUFFER, depthbufferPostProcess);
+//    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WIDTH, HEIGHT);
+//    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthbufferPostProcess);
+//
+//}
+// 在构造函数或初始化函数中
+void Application::initPostProcess() {
+    // 创建帧缓冲对象
+    glGenFramebuffers(1, &framebufferPostProcess);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebufferPostProcess);
+
+    // 创建颜色纹理附件
+    glActiveTexture(GL_TEXTURE1); // 激活 GL_TEXTURE1
+    glGenTextures(1, &texturePostProcess);
+    glBindTexture(GL_TEXTURE_2D, texturePostProcess);
+    //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WIDTH, HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SHADOWTEX_WIDTH, SHADOWTEX_WIDTH, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texturePostProcess, 0);
+
+    // 创建深度渲染缓冲附件
+    glGenRenderbuffers(1, &depthbufferPostProcess);
+    glBindRenderbuffer(GL_RENDERBUFFER, depthbufferPostProcess);
+    //glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WIDTH, HEIGHT);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, SHADOWTEX_WIDTH, SHADOWTEX_WIDTH);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthbufferPostProcess);
+
+    // 检查帧缓冲对象是否完整
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cerr << "Framebuffer is not complete!" << std::endl;
+
+    // 解绑帧缓冲对象，防止意外修改
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindTexture(GL_TEXTURE_2D, 0); // 解绑纹理
+}
+
+
+
+//void Application::runPostProcess() {
+//    // 使用后期处理着色器
+//    m_postProcessShader.bind();
+//
+//    // 激活并绑定纹理单元
+//    glActiveTexture(GL_TEXTURE1);
+//    glBindTexture(GL_TEXTURE_2D, texturePostProcess); // 绑定自定义帧缓冲对象的颜色纹理附件
+//
+//    // 设置着色器中的采样器
+//    glUniform1i(m_postProcessShader.getUniformLocation("scene"), 1);
+//
+//    // 渲染全屏四边形，应用后期处理效果
+//    renderFullScreenQuad();
+//}
+void Application::runPostProcess() {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // 使用后期处理着色器
+    m_postProcessShader.bind();
+
+    // 激活并绑定纹理单元
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, texturePostProcess); // 绑定自定义帧缓冲对象的颜色纹理附件
+
+    // 设置着色器中的采样器
+    glUniform1i(m_postProcessShader.getUniformLocation("scene"), 1);
+
+    // 渲染全屏四边形，应用后期处理效果
+    renderFullScreenQuad();
+
+}
+
+void Application::renderFullScreenQuad() {
+    static unsigned int quadVAO = 0;
+    static unsigned int quadVBO;
+    //glViewport(0, 0, WIDTH, HEIGHT);
+    glViewport(0, 0, SHADOWTEX_WIDTH, SHADOWTEX_WIDTH);
+
+    if (quadVAO == 0) {
+        float quadVertices[] = {
+            // 位置        // 纹理坐标
+            -1.0f,  1.0f,  0.0f, 1.0f,
+            -1.0f, -1.0f,  0.0f, 0.0f,
+             1.0f, -1.0f,  1.0f, 0.0f,
+
+            -1.0f,  1.0f,  0.0f, 1.0f,
+             1.0f, -1.0f,  1.0f, 0.0f,
+             1.0f,  1.0f,  1.0f, 1.0f
+        };
+
+        // 设置 VAO 和 VBO
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW );
+
+        // 位置属性
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+        // 纹理坐标属性
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),  (void*)(2 * sizeof(float)));
+    }
+
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
 }
