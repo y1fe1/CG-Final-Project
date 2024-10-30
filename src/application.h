@@ -18,6 +18,7 @@ private:
     Shader m_lightShader;
     Shader m_borderShader;
     Shader m_pointShader;
+    Shader m_postProcessShader;
 
     std::vector<GPUMesh> m_meshes;
     Material m_Material;
@@ -48,6 +49,17 @@ private:
     void drawMiniMapBorder();
     void drawCameraPositionOnMinimap(const glm::vec4& cameraPosInMinimap);
     Minimap minimap;
+
+    //Post-Process Shader
+    bool usePostProcess;
+    void initPostProcess();
+    void runPostProcess();
+    void renderFullScreenQuad();
+    GLuint framebufferPostProcess;
+    GLuint texturePostProcess;
+    GLuint depthbufferPostProcess;
+    const int WINDOW_WIDTH = 1024;
+    const int WINDOW_HEIGHT = 1024;
 
 public:
     Application();
