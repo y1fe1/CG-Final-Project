@@ -25,9 +25,6 @@ DISABLE_WARNINGS_POP()
 #include <iostream>
 #include <vector>
 
-#include "camera.h"
-
-
 inline const int WIDTH = 1200;
 inline const int HEIGHT = 800;
 

@@ -11,13 +11,15 @@ endif()
 
 add_executable(Master_TechDemo
     "src/application.cpp"
+	"src/application.h"
     "src/texture.cpp"
 	"src/mesh.cpp"
 	"src/protocol.h" 
 	"src/camera.cpp" 
 	"src/camera.h"   
 	"src/main.cpp" 
-	"src/application.h"
+	"src/cubeMapTexture.cc"
+	"src/cubeMapTexture.h"
  )
 
 target_compile_definitions(Master_TechDemo PRIVATE RESOURCE_ROOT="${CMAKE_CURRENT_LIST_DIR}/")

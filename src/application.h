@@ -2,6 +2,10 @@
 
 #include "protocol.h"
 #include <framework/trackball.h>
+
+#include "camera.h"
+#include "cubeMapTexture.h"
+
 #define MAX_LIGHT_CNT 10
 
 class Application {
@@ -27,6 +31,24 @@ private:
     Shader m_shadowShader;
     Shader m_lightShader;
 
+    // SkyBox 
+
+    // faces should follow this format
+    std::vector<std::filesystem::path> faces = {
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "right.jpg"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "left.jpg"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "top.jpg"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "bottom.jpg"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "front.jpg"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "back.jpg")
+    };
+
+    cubeMapTex skyboxTexture;
+    GLuint skyboxVAO,skyboxVBO;
+
+    Shader m_skyBoxShader;
+
+    // Definition for model Obejcts includeing texture and Material
     std::vector<GPUMesh> m_meshes;
     Texture m_texture;
 
@@ -44,13 +66,18 @@ private:
 
     int curMaterialIndex = 0;
 
+    //
+
     glm::mat4 m_projectionMatrix;
     glm::mat4 m_viewMatrix;
     glm::mat4 m_modelMatrix;
 
+
+    // Definition for Cameras
     std::vector<Camera> cameras;
     Camera* selectedCamera;
 
+    // Definition for Lights
     std::vector<Light> lights{};
     Light* selectedLight;
 

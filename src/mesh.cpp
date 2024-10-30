@@ -56,6 +56,8 @@ GPUMesh::GPUMesh(const Mesh& cpuMesh)
     // Each triangle has 3 vertices.
     m_numIndices = static_cast<GLsizei>(3 * cpuMesh.triangles.size());
 
+    glBindVertexArray(0);
+
     // Set up shadow Vao
     initializeShadowVAO();
 }

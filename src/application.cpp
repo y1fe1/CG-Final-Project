@@ -16,6 +16,10 @@ Application::Application()
     ,
     // init PBR material
     m_PbrMaterial{ glm::vec3{ 0.8, 0.6, 0.4 }, 1.0f, 0.2f, 1.0f },
+
+    //init skyboxTex
+    skyboxTexture(faces),
+
     trackball{ &m_window, glm::radians(50.0f) }
 {
     //Camera defaultCamera = Camera(&m_window);
@@ -71,6 +75,26 @@ Application::Application()
             onMouseReleased(button, mods);
         });
 
+    // === Create SkyBox Vertices ===
+    try {
+        glGenVertexArrays(1, &skyboxVAO);
+        glGenBuffers(1, &skyboxVBO);
+        glBindVertexArray(skyboxVAO);
+
+        glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices, GL_STATIC_DRAW);
+
+        // Set vertex attribute pointers
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+        glBindVertexArray(0);
+    }
+
+    catch (std::runtime_error e) {
+        std::cerr << e.what() << std::endl;
+    }
+
     std::string textureFullPath = std::string(RESOURCE_ROOT) + texturePath;
     std::vector<Mesh> cpuMeshes = loadMesh(RESOURCE_ROOT "resources/sphere.obj");
 
@@ -117,6 +141,12 @@ Application::Application()
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/light_frag.glsl");
         m_lightShader = lightShaderBuilder.build();
 
+        ShaderBuilder skyBoxBuilder;
+        skyBoxBuilder
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/skybox_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/skybox_frag.glsl");
+        m_skyBoxShader = skyBoxBuilder.build();
+
     }
     catch (ShaderLoadingException e) {
         std::cerr << e.what() << std::endl;
@@ -153,10 +183,10 @@ void Application::update() {
 
         //const glm::vec3 cameraPos = trackball.position();
         const glm::vec3 cameraPos = selectedCamera->cameraPos();
-        const glm::mat4 model{ 1.0f };
+        /*const glm::mat4 model{ 1.0f };
 
         const glm::mat4 view = trackball.viewMatrix();
-        const glm::mat4 projection = trackball.projectionMatrix();
+        const glm::mat4 projection = trackball.projectionMatrix();*/
 
         glm::mat4 lightMVP;
         GLfloat near_plane = 0.5f, far_plane = 30.0f;
@@ -195,7 +225,7 @@ void Application::update() {
             m_debugShader.bind();
             glUniformMatrix4fv(m_debugShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
             glUniformMatrix3fv(m_debugShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
-            glUniformMatrix3fv(m_debugShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
+            glUniformMatrix4fv(m_debugShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
             mesh.drawBasic(m_debugShader);
 
             // Draw the mesh again for each light / shading model.
@@ -220,7 +250,7 @@ void Application::update() {
             // Set up matrices and view position
             glUniformMatrix4fv(m_selShader->getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
             glUniformMatrix3fv(m_selShader->getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
-            glUniformMatrix3fv(m_selShader->getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
+            glUniformMatrix4fv(m_selShader->getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
             glUniformMatrix4fv(m_selShader->getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
             glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
 
@@ -276,6 +306,22 @@ void Application::update() {
                 genUboBufferObj(*selectedLight, lightUBO); // Pass single Light
                 mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
             }
+
+            glDepthFunc(GL_LEQUAL);
+
+            m_skyBoxShader.bind();
+            glm::mat4 view = glm::mat4(glm::mat3(m_viewMatrix));
+            glm::mat4 projection = glm::perspective(glm::radians(80.0f), m_window.getAspectRatio(), 0.1f, 100.0f);
+            glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(view));
+            glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+            glBindVertexArray(skyboxVAO);
+            skyboxTexture.bind(GL_TEXTURE20);
+
+            glUniform1i(m_skyBoxShader.getUniformLocation("skybox"), 20);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+            glBindVertexArray(0);
+            glDepthFunc(GL_LESS);
 
             int lightsCnt = static_cast<int>(lights.size());
             glBindVertexArray(mesh.getVao());
