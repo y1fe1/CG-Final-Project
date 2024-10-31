@@ -11,12 +11,17 @@ endif()
 
 add_executable(Master_TechDemo
     "src/application.cpp"
+	"src/application.h"
     "src/texture.cpp"
 	"src/mesh.cpp"
 	"src/protocol.h" 
 	"src/camera.cpp" 
 	"src/camera.h"   
 	"src/main.cpp" 
+	"src/cubeMapTexture.cc"
+	"src/cubeMapTexture.h"
+	"src/hdrTexture.cc"
+	"src/hdrTexture.h"
 	"src/application.h"
   "src/minimap.cpp" "src/minimap.h")
 
