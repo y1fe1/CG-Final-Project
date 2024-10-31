@@ -11,7 +11,9 @@ DISABLE_WARNINGS_POP()
 
 #define SKYBOX_PATH "resources/texture/skybox/"
 
-#define RENDER_HDR_CUBE_MAP true
+#define RENDER_HDR_CUBE_MAP 1
+#define RENDER_HDR_IRRIDIANCE_MAP 2
+#define RENDER_PRE_FILTER_HDR_MAP 3
 
 // this file will handle cubeMap class for environment mapping
 struct cubeMapLoadingException : public std::runtime_error {
@@ -23,7 +25,7 @@ class cubeMapTex {
 public:
 	cubeMapTex(std::vector<std::filesystem::path> filePaths);
 
-	cubeMapTex(bool renderCubeMap = false);
+	cubeMapTex(int renderChoice = 0);
 
 	cubeMapTex(const cubeMapTex&) = delete;
 	cubeMapTex& operator=(const cubeMapTex&) = delete;

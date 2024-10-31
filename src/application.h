@@ -64,6 +64,16 @@ private:
     Shader m_hdrToCubeShader;
     Shader m_hdrSkyBoxShader;
 
+    cubeMapTex hdrIrradianceMap;
+    Shader m_hdrToIrradianceShader;
+
+    cubeMapTex hdrPrefilteredMap;
+    Shader m_hdrPrefilterShader;
+
+    Texture BRDFTexture;
+    Shader m_brdfShader;
+    GLuint quadVAO = 0, quadVBO = 0;
+
     // Definition for model Obejcts includeing texture and Material
     std::vector<GPUMesh> m_meshes;
     Texture m_texture;

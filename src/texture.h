@@ -7,6 +7,8 @@ DISABLE_WARNINGS_POP()
 #include <filesystem>
 #include <framework/opengl_includes.h>
 
+#define BRDF_2D_TEXTURE 10
+
 struct ImageLoadingException : public std::runtime_error {
     using std::runtime_error::runtime_error;
 };
@@ -14,6 +16,9 @@ struct ImageLoadingException : public std::runtime_error {
 class Texture {
 public:
     Texture(std::filesystem::path filePath);
+
+    Texture(int textureGenCod); // Constructor specified for generating BRDF Texture
+
     Texture(const Texture&) = delete;
     Texture(Texture&&);
     ~Texture();
@@ -22,6 +27,8 @@ public:
     Texture& operator=(Texture&&) = default;
 
     void bind(GLint textureSlot);
+
+    GLuint& getTextureRef();
 
 private:
     static constexpr GLuint INVALID = 0xFFFFFFFF;

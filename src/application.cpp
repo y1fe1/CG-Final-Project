@@ -22,6 +22,10 @@ Application::Application()
     //init hdrTex and hdr cubemap
     , hdrTextureMap(hdrSamplePath)
     , hdrCubeMap(RENDER_HDR_CUBE_MAP)
+    , hdrIrradianceMap(RENDER_HDR_IRRIDIANCE_MAP)
+    , hdrPrefilteredMap(RENDER_PRE_FILTER_HDR_MAP)
+    , BRDFTexture(BRDF_2D_TEXTURE)
+
     , trackball{ &m_window, glm::radians(50.0f) }
 {
     //Camera defaultCamera = Camera(&m_window);
@@ -35,11 +39,11 @@ Application::Application()
         { glm::vec3(-1, 3, 2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
     );
 
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/normal.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/albedo.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/metallic.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/roughness.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/ao.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/normal.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/albedo.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/metallic.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/roughness.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/ao.png")));
 
     //lights.push_back(
     //    { glm::vec3(2, 1, 2), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
@@ -116,6 +120,7 @@ Application::Application()
 
         // init cube to render hdr map
     
+        // This Shader convert HDR Texture we got and put it onto the hdr_cube_map
         ShaderBuilder hdrToCubeMapShaderBuilder;
         hdrToCubeMapShaderBuilder
             .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/hdr_to_cube_vert.glsl")
@@ -141,6 +146,106 @@ Application::Application()
         }   
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+        //// let OpenGL generate mipmaps from first mip face (combatting visible dots artifact)
+        //glBindFramebuffer(GL_TEXTURE_CUBE_MAP, hdrCubeMap.getTextureRef());
+        //glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+        //glBindFramebuffer(GL_TEXTURE_CUBE_MAP, 0);
+
+        // integral convolution to create hdr irridiance map
+
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);  // rebuild buffer for irridiance map
+
+        ShaderBuilder hdrToIrradianceShaderBuilder;
+        hdrToIrradianceShaderBuilder
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/hdr_to_cube_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_cube_to_irradiance_frag.glsl");
+        m_hdrToIrradianceShader = hdrToIrradianceShaderBuilder.build();
+
+        m_hdrToIrradianceShader.bind();
+        glUniformMatrix4fv(m_hdrToCubeShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(captureProjection));
+
+        hdrCubeMap.bind(GL_TEXTURE0);
+        glUniform1i(m_hdrToIrradianceShader.getUniformLocation("environmentMap"), 0);
+
+        glViewport(0, 0, 32, 32);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        for (GLuint i = 0; i < 6; ++i)
+        {
+            glUniformMatrix4fv(m_hdrToIrradianceShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(captureViews[i]));
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, hdrIrradianceMap.getTextureRef(), 0);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            renderHDRCubeMap(cubeVAO, cubeVBO, hdrMapVertices, 288);
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+        // enable seamless cubemap sampling for lower mip levels in the pre-filter map.
+        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+        // generate hdr prefiltered Map
+        ShaderBuilder hdrPrefilteredShaderBuilder;
+        hdrPrefilteredShaderBuilder
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/hdr_to_cube_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_cube_to_prefilter_frag.glsl");
+        m_hdrPrefilterShader = hdrPrefilteredShaderBuilder.build();
+
+        m_hdrPrefilterShader.bind();
+
+        glUniformMatrix4fv(m_hdrPrefilterShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(captureProjection));
+
+        hdrCubeMap.bind(GL_TEXTURE0);
+        glUniform1i(m_hdrPrefilterShader.getUniformLocation("environmentMap"), 0);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        GLuint maxMipLevels = 5;
+        for (GLuint mip = 0; mip < maxMipLevels; ++mip)
+        {
+            // reisze framebuffer according to mip-level size.
+            GLuint mipWidth = static_cast<GLuint>(128 * std::pow(0.5, mip));
+            GLuint mipHeight = static_cast<GLuint>(128 * std::pow(0.5, mip));
+            glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
+            glViewport(0, 0, mipWidth, mipHeight);
+
+            float roughness = (float)mip / (float)(maxMipLevels - 1);
+            glUniform1i(m_hdrPrefilterShader.getUniformLocation("roughness"), roughness);
+
+            for (GLuint i = 0; i < 6; ++i)
+            {
+                glUniformMatrix4fv(m_hdrPrefilterShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(captureViews[i]));
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, hdrPrefilteredMap.getTextureRef(), mip);
+
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                renderHDRCubeMap(cubeVAO, cubeVBO, hdrMapVertices, 288);
+            }
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+        // Gen BRDF Texture
+        ShaderBuilder brdfShaderBuilder;
+        brdfShaderBuilder
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/texture_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/brdf_frag.glsl");
+        m_brdfShader = brdfShaderBuilder.build();
+
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, BRDFTexture.getTextureRef(), 0);
+
+        glViewport(0, 0, 512, 512);
+
+        m_brdfShader.bind();
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        renderQuad(quadVAO,quadVBO,quadVertices,20);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     catch (std::runtime_error e) {
@@ -155,7 +260,7 @@ Application::Application()
 
     // === Create Material Texture if its valid path ===
     std::string textureFullPath = std::string(RESOURCE_ROOT) + texturePath;
-    std::vector<Mesh> cpuMeshes = loadMesh(RESOURCE_ROOT "resources/sphere.obj");
+    std::vector<Mesh> cpuMeshes = loadMesh(RESOURCE_ROOT "resources/sphere.obj"); //"resources/texture/Cerberus_by_Andrew_Maximov/Cerberus_LP.obj
 
     if (std::filesystem::exists((textureFullPath))) {
         std::shared_ptr texPtr = std::make_shared<Image>(textureFullPath);
@@ -351,28 +456,39 @@ void Application::update() {
             //glDepthMask(GL_TRUE);
             //glDisable(GL_BLEND);
 
-
-            if (envMapEnabled && hdrMapEnabled) {
-                glBindVertexArray(mesh.getVao());
-                skyboxTexture.bind(GL_TEXTURE20);
-                glDrawArrays(GL_TRIANGLES, 0, 36);
-                glUniform1i(m_selShader->getUniformLocation("SkyBox"), 20);
-                glUniform1i(m_selShader->getUniformLocation("useEnvMap"), envMapEnabled);
-                glBindVertexArray(0);
-            }
+            // pass in env map
+            glBindVertexArray(mesh.getVao());
+            skyboxTexture.bind(GL_TEXTURE20);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+            glUniform1i(m_selShader->getUniformLocation("SkyBox"), 20);
+            glUniform1i(m_selShader->getUniformLocation("useEnvMap"), envMapEnabled);
+            glBindVertexArray(0);
 
             // Generate UBOs and draw
             if (multiLightShadingEnabled) {
-                genUboBufferObj(m_PbrMaterial, PbrUBO);
                 genUboBufferObj(lights, lightUBO, MAX_LIGHT_CNT);
                 glUniform1i(m_selShader->getUniformLocation("LightCount"), static_cast<GLint>(lights.size()));
 
                 if (usePbrShading) {
+
+                    genUboBufferObj(m_PbrMaterial, PbrUBO);
+
                     glUniform1i(m_selShader->getUniformLocation("normalMap"), true ? 10 : -1);
                     glUniform1i(m_selShader->getUniformLocation("albedoMap"), true ? 11 : -1);
                     glUniform1i(m_selShader->getUniformLocation("metallicMap"), true ? 12 : -1);
                     glUniform1i(m_selShader->getUniformLocation("roughnessMap"), true ? 13 : -1);
                     glUniform1i(m_selShader->getUniformLocation("aoMap"), true ? 14 : -1);
+
+                    hdrIrradianceMap.bind(GL_TEXTURE15);
+                    glUniform1i(m_selShader->getUniformLocation("irradianceMap"), true ? 15 : -1);
+
+                    hdrPrefilteredMap.bind(GL_TEXTURE16);
+                    glUniform1i(m_selShader->getUniformLocation("prefilteredMap"), true ? 16 : -1);
+
+                    BRDFTexture.bind(GL_TEXTURE17);
+                    glUniform1i(m_selShader->getUniformLocation("brdfLUT"), true ? 17 : -1);
+
+                    glUniform1i(m_selShader->getUniformLocation("hdrEnvMapEnabled"), hdrMapEnabled);
 
                     mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
                 }
@@ -413,7 +529,7 @@ void Application::update() {
 #pragma endregion
 
         // Render Enviroment Mapping at the end
-        if (hdrMapEnabled) {
+        if (envMapEnabled) {
 
             glm::mat4 viewModel = glm::mat4(glm::mat3(view));
 
@@ -446,6 +562,12 @@ void Application::update() {
 
             glDepthFunc(GL_LESS);
         }
+        
+        /*glDisable(GL_DEPTH_TEST);
+        m_brdfShader.bind();
+        renderQuad(quadVAO,quadVBO,quadVertices,20);
+        glEnable(GL_DEPTH_TEST);*/
+
         m_window.swapBuffers();
     }
 }

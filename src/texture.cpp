@@ -43,6 +43,31 @@ Texture::Texture(std::filesystem::path filePath)
 
     // Generate mip-maps
     glGenerateMipmap(GL_TEXTURE_2D);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+Texture::Texture(int textureGenCod)
+{
+
+    if (textureGenCod == BRDF_2D_TEXTURE){
+        // Create a texture on the GPU and bind it for parameter setting
+        glGenTextures(1, &m_texture);
+        glBindTexture(GL_TEXTURE_2D, m_texture);
+
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, 512,512, 0, GL_RG, GL_FLOAT, 0);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    else {
+        m_texture = INVALID;
+    }
 }
 
 Texture::Texture(Texture&& other)
@@ -61,4 +86,10 @@ void Texture::bind(GLint textureSlot)
 {
     glActiveTexture(textureSlot);
     glBindTexture(GL_TEXTURE_2D, m_texture);
+}
+
+GLuint& Texture::getTextureRef()
+{
+    return m_texture;
+    // TODO: insert return statement here
 }
