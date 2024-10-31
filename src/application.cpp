@@ -202,7 +202,7 @@ Application::Application()
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/light_frag.glsl");
         m_lightShader = lightShaderBuilder.build();
 
-        ShaderBuilder skyBoxBuilder;
+				ShaderBuilder skyBoxBuilder;
         skyBoxBuilder
             .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/skybox_vert.glsl")
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/skybox_frag.glsl");
@@ -213,6 +213,23 @@ Application::Application()
             .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/skybox_vert.glsl")
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_skybox_frag.glsl");
         m_hdrSkyBoxShader = hdrSkyBoxBuilder.build();
+			
+				ShaderBuilder borderShader;
+        borderShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/border_vert.glsl");
+        borderShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/border_frag.glsl");
+        m_borderShader = borderShader.build();
+
+        ShaderBuilder pointShader;
+        pointShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/border_vert.glsl");
+        pointShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/border_frag.glsl");
+        m_pointShader = pointShader.build();
+
+        ShaderBuilder postProcessShader;
+        postProcessShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/postProcess_vert.glsl");
+        postProcessShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/postProcess_frag.glsl");
+        m_postProcessShader = postProcessShader.build();
+
+        initPostProcess();
     }
     catch (ShaderLoadingException e) {
         std::cerr << e.what() << std::endl;
@@ -237,6 +254,18 @@ void Application::update() {
 
         //selectedCamera->updateInput();
         m_viewMatrix = selectedCamera->viewMatrix();
+
+        if (usePostProcess) {
+            // 绑定自定义的帧缓冲对象
+            glBindFramebuffer(GL_FRAMEBUFFER, framebufferPostProcess);
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        }
+        else {
+            // 绑定默认帧缓冲对象（屏幕）
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            //glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
+        }
 
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 
@@ -385,6 +414,10 @@ void Application::update() {
                 mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
             }
 
+            genUboBufferObj(selectedLight, lightUBO);
+            mesh.draw(m_defaultShader);
+            renderMiniMap();
+           	
             int lightsCnt = static_cast<int>(lights.size());
             glBindVertexArray(mesh.getVao());
             m_lightShader.bind();
@@ -431,8 +464,8 @@ void Application::update() {
             else {
 
                 m_skyBoxShader.bind();
-
-                //glm::mat4 projection = glm::perspective(glm::radians(80.0f), float(WIDTH)/float(HEIGHT), 0.1f, 100.0f);
+							
+ 								//glm::mat4 projection = glm::perspective(glm::radians(80.0f), float(WIDTH)/float(HEIGHT), 0.1f, 100.0f);
                 glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(viewModel));
                 glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
@@ -446,6 +479,15 @@ void Application::update() {
 
             glDepthFunc(GL_LESS);
         }
+							
+        if (usePostProcess) {
+            // 绑定默认帧缓冲对象，将结果绘制到屏幕
+
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            runPostProcess();
+            glFinish();
+        }
+			
         m_window.swapBuffers();
     }
 }
@@ -535,7 +577,14 @@ void Application::imgui() {
 
     selectedCamera = &cameras[curCameraIndex];
     ImGui::Text("Selected Camera Index: %d", curCameraIndex);
+    ImGui::Checkbox("Use Bezier", &selectedCamera->m_useBezier);
+    ImGui::Checkbox("Use Constant Speed", &selectedCamera->m_bezierConstantSpeed);
+    ImGui::DragFloat3("P0", &selectedCamera->P0.x);
+    ImGui::DragFloat3("P1", &selectedCamera->P1.x);
+    ImGui::DragFloat3("P2", &selectedCamera->P2.x);
+    ImGui::DragFloat3("P3", &selectedCamera->P3.x);
 
+    ImGui::Checkbox("usePostProcess", &usePostProcess);
     // Button for clearing Camera
     if (ImGui::Button("Reset Cameras")) {
         //resetObjList(cameras,defaultLight);
@@ -608,3 +657,210 @@ void Application::onMouseReleased(int button, int mods) {
     std::cout << "Released mouse button: " << button << std::endl;
 }
 
+
+
+void Application::renderMiniMap() {
+
+    glViewport(800, 800, 200, 200); // Make it to up-right
+
+    // 使用小地图的视图矩阵和投影矩阵渲染场景
+    m_defaultShader.bind();
+    const glm::mat4 mvpMatrix = minimap.projectionMatrix() * minimap.viewMatrix() * m_modelMatrix;
+    glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+
+    // 渲染小地图内容
+    for (GPUMesh& mesh : m_meshes) {
+        mesh.draw(m_defaultShader);
+    }
+
+    const glm::mat4 minimapVP = minimap.projectionMatrix() * minimap.viewMatrix() * m_modelMatrix;
+    glm::vec4 cameraPosInMinimap = minimapVP * glm::vec4(selectedCamera->cameraPos(), 1.0f);
+    cameraPosInMinimap /= cameraPosInMinimap.w; // 透视除法，得到标准化设备坐标
+    
+    drawCameraPositionOnMinimap(cameraPosInMinimap);
+
+    // 恢复主视口
+    glViewport(0, 0, 1024, 1024);
+    drawMiniMapBorder();
+}
+
+
+void Application::drawMiniMapBorder() {
+    // Disable Depth Test to make sure our Border will not be covered
+    glDisable(GL_DEPTH_TEST);
+
+    // Use Polygon Mode to draw Map Border
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    // Define Map Border 
+    float borderLeft = 800.0f / 1024.0f * 2.0f - 1.0f;
+    float borderRight = (800.0f + 200.0f) / 1024.0f * 2.0f - 1.0f;
+    float borderBottom = 800.0f / 1024.0f * 2.0f - 1.0f;
+    float borderTop = (800.0f + 200.0f) / 1024.0f * 2.0f - 1.0f;
+
+    // Set Vertex data
+    float borderVertices[] = {
+        borderLeft,  borderBottom, 0.0f,  
+        borderRight, borderBottom, 0.0f,  
+        borderRight, borderTop,    0.0f,  
+        borderLeft,  borderTop,    0.0f   
+    };
+
+    // Use Border Shader to set color
+    m_borderShader.bind();
+    glUniform3f(m_borderShader.getUniformLocation("color"), 1.0f, 1.0f, 0.0f); // Set Color to Yellow
+
+    GLuint borderVBO, borderVAO;
+    glGenVertexArrays(1, &borderVAO);
+    glGenBuffers(1, &borderVBO);
+    glBindVertexArray(borderVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, borderVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(borderVertices), borderVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Draw rectangle
+    glDrawArrays(GL_LINE_LOOP, 0, 4);
+
+    // Clean
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    glDeleteBuffers(1, &borderVBO);
+    glDeleteVertexArrays(1, &borderVAO);
+
+    // Reset
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glEnable(GL_DEPTH_TEST);
+}
+
+void Application::drawCameraPositionOnMinimap(const glm::vec4& cameraPosInMinimap) {
+    glDisable(GL_DEPTH_TEST); // Make sure our dot will not be covered
+
+    float x = cameraPosInMinimap.x;
+    float y = cameraPosInMinimap.y;
+
+    // Set position data of our main camera
+    float pointVertices[] = { x, y, 0.0f };
+
+    GLuint pointVAO, pointVBO;
+    glGenVertexArrays(1, &pointVAO);
+    glGenBuffers(1, &pointVBO);
+
+    glBindVertexArray(pointVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, pointVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(pointVertices), pointVertices, GL_STATIC_DRAW);
+
+    // Set VAO
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Use Point Shader
+    m_pointShader.bind();
+    glUniform3f(m_pointShader.getUniformLocation("color"), 1.0f, 0.0f, 0.0f); // Set point to red
+
+    // Draw Dot
+    glPointSize(6.0f);
+    glDrawArrays(GL_POINTS, 0, 1);
+
+    // Clean
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    glDeleteBuffers(1, &pointVBO);
+    glDeleteVertexArrays(1, &pointVAO);
+
+    glEnable(GL_DEPTH_TEST);
+}
+
+// 在构造函数中
+void Application::initPostProcess() {
+    // 创建帧缓冲对象
+    glGenFramebuffers(1, &framebufferPostProcess);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebufferPostProcess);
+
+    // 创建颜色纹理附件
+    //glActiveTexture(GL_TEXTURE1); // 激活 GL_TEXTURE1
+    glGenTextures(1, &texturePostProcess);
+    glBindTexture(GL_TEXTURE_2D, texturePostProcess);
+    //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WIDTH, HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WINDOW_WIDTH, WINDOW_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texturePostProcess, 0);
+
+    // 创建深度渲染缓冲附件
+    glGenRenderbuffers(1, &depthbufferPostProcess);
+    glBindRenderbuffer(GL_RENDERBUFFER, depthbufferPostProcess);
+    //glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WIDTH, HEIGHT);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WINDOW_WIDTH, WINDOW_HEIGHT);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthbufferPostProcess);
+
+    // 检查帧缓冲对象是否完整
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cerr << "Framebuffer is not complete!" << std::endl;
+
+    // 解绑帧缓冲对象，防止意外修改
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+
+void Application::runPostProcess() {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // 使用后期处理着色器
+    m_postProcessShader.bind();
+
+    // 激活并绑定纹理单元
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texturePostProcess); // 绑定自定义帧缓冲对象的颜色纹理附件
+
+    // 设置着色器中的采样器
+    glUniform1i(m_postProcessShader.getUniformLocation("scene"), 0);
+
+
+    glDisable(GL_DEPTH_TEST);
+    // 渲染全屏四边形，应用后期处理效果
+    renderFullScreenQuad();
+    glEnable(GL_DEPTH_TEST);
+
+}
+
+void Application::renderFullScreenQuad() {
+    static unsigned int quadVAO = 0;
+    static unsigned int quadVBO;
+    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+
+    if (quadVAO == 0) {
+        float quadVertices[] = {
+            // 位置        // 纹理坐标
+            -1.0f,  1.0f,  0.0f, 1.0f,
+            -1.0f, -1.0f,  0.0f, 0.0f,
+             1.0f, -1.0f,  1.0f, 0.0f,
+
+            -1.0f,  1.0f,  0.0f, 1.0f,
+             1.0f, -1.0f,  1.0f, 0.0f,
+             1.0f,  1.0f,  1.0f, 1.0f
+        };
+
+        // 设置 VAO 和 VBO
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW );
+
+        // 位置属性
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+        // 纹理坐标属性
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),  (void*)(2 * sizeof(float)));
+    }
+
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+}

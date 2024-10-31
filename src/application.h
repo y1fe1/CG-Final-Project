@@ -8,6 +8,7 @@
 #include "hdrTexture.h"
 
 #define MAX_LIGHT_CNT 10
+#include "minimap.h"
 
 class Application {
 private:
@@ -31,6 +32,9 @@ private:
 
     Shader m_shadowShader;
     Shader m_lightShader;
+    Shader m_borderShader;
+    Shader m_pointShader;
+    Shader m_postProcessShader;
 
     // Definition for SkyBox 
     bool envMapEnabled = false;
@@ -105,6 +109,23 @@ private:
     const int SHADOWTEX_HEIGHT = 1024;
     
     void imgui();
+    
+    //Minimap
+    void renderMiniMap();
+    void drawMiniMapBorder();
+    void drawCameraPositionOnMinimap(const glm::vec4& cameraPosInMinimap);
+    Minimap minimap;
+
+    //Post-Process Shader
+    bool usePostProcess;
+    void initPostProcess();
+    void runPostProcess();
+    void renderFullScreenQuad();
+    GLuint framebufferPostProcess;
+    GLuint texturePostProcess;
+    GLuint depthbufferPostProcess;
+    const int WINDOW_WIDTH = 1024;
+    const int WINDOW_HEIGHT = 1024;
 
 public:
     Application();
@@ -114,4 +135,5 @@ public:
     void onMouseMove(const glm::dvec2& cursorPos);
     void onMouseClicked(int button, int mods);
     void onMouseReleased(int button, int mods);
+
 };
