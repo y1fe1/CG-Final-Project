@@ -26,13 +26,6 @@ Application::Application()
     , hdrPrefilteredMap(RENDER_PRE_FILTER_HDR_MAP)
     , BRDFTexture(BRDF_2D_TEXTURE)
 
-    // SSAO Buffer Generation
-    , gPos(SSAO_GBUFFER_POS)
-    , gNor(SSAO_GBUFFER_NOR)
-    , gCol(SSAO_GBUFFER_COL)
-    , ssaoColorBuff(SSAO_COLOR_BUFF)
-    , ssaoColorBlurBuff(SSAO_COLOR_BLUR)
-    , ssaoNoiseTex()
     , trackball{ &m_window, glm::radians(50.0f) }
 {
     //Camera defaultCamera = Camera(&m_window);
@@ -91,70 +84,7 @@ Application::Application()
     // generate env maps
     generateSkyBox();
 
-    // gen HDR map
     generateHdrMap();
-
-    try 
-    {
-        glGenFramebuffers(1, &gBuffer);
-        glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-
-        if(gPos.gBufferCode == SSAO_GBUFFER_POS)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPos.getTextureRef(), 0);
-        if(gNor.gBufferCode == SSAO_GBUFFER_NOR)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNor.getTextureRef(), 0);
-        if(gCol.gBufferCode == SSAO_GBUFFER_COL)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gCol.getTextureRef(), 0);
-
-        GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-        glDrawBuffers(3, attachments);
-
-        // render buffer
-        glGenRenderbuffers(1, &renderDepth);
-        glBindRenderbuffer(GL_RENDERBUFFER, renderDepth);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WIDTH, HEIGHT);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderDepth);
-
-        // finally check if framebuffer is complete
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-            std::cout << "Framebuffer not complete!" << std::endl;
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        glGenFramebuffers(1, &ssaoFBO);  
-        glGenFramebuffers(1, &ssaoBlurFBO);
-        glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
-
-        if(ssaoColorBuff.gBufferCode == SSAO_COLOR_BUFF)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBuff.getTextureRef(), 0);
-
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-            std::cout << "SSAO Framebuffer not complete!" << std::endl;
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
-        if (ssaoColorBlurBuff.gBufferCode == SSAO_COLOR_BLUR)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBlurBuff.getTextureRef(), 0);
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-            std::cout << "SSAO Framebuffer not complete!" << std::endl;
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
-        std::default_random_engine generator;
-
-        // generate sample kernel
-        std::vector<glm::vec3> ssaoKernel = generateSSAOKernel();
-
-        // generate noise
-        std::vector<glm::vec3> ssaoNoise = generateSSAONoise();
-
-        ssaoNoiseTex = std::move(ssaoBufferTex(SSAO_NOISE_TEX, ssaoNoise));
-
-
-    }
-    catch (std::runtime_error e) 
-    {
-        std::cerr << e.what() << std::endl;
-    }
 
     // then before rendering, configure the viewport to the original framebuffer's screen dimensions
     glm::ivec2 windowSizes = m_window.getWindowSize();
@@ -209,7 +139,6 @@ Application::Application()
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/light_frag.glsl");
         m_lightShader = lightShaderBuilder.build();
 
-        // setup skybox shader
         ShaderBuilder skyBoxBuilder;
         skyBoxBuilder
             .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/skybox_vert.glsl")
@@ -221,31 +150,6 @@ Application::Application()
             .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/skybox_vert.glsl")
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_skybox_frag.glsl");
         m_hdrSkyBoxShader = hdrSkyBoxBuilder.build();
-
-        ShaderBuilder shaderGeometryPassBuilder;
-        shaderGeometryPassBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/ssao_geo_shader_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/ssao_geo_shader_frag.glsl");
-        m_shaderGeometryPass = shaderGeometryPassBuilder.build();
-
-        ShaderBuilder shaderLightingPassBuilder;
-        shaderLightingPassBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/light_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/light_frag.glsl");
-        m_shaderLightingPass = shaderLightingPassBuilder.build();
-
-        ShaderBuilder ssaoBuilder;
-        ssaoBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/light_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/light_frag.glsl");
-        m_shaderSSAO = ssaoBuilder.build();
-
-        ShaderBuilder ssaoBlurBuilder;
-        ssaoBlurBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/light_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/light_frag.glsl");
-        m_shaderSSAOBlur = ssaoBuilder.build();
-        
     }
     catch (ShaderLoadingException e) {
         std::cerr << e.what() << std::endl;
@@ -335,24 +239,6 @@ void Application::update() {
             //glDepthFunc(GL_EQUAL); // Only draw a pixel if it's depth matches the value stored in the depth buffer.
             //glEnable(GL_BLEND); // Enable blending.
             //glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-
-            // ssao will set a completely different render pipeline
-            if (ssaoEnabled) 
-            {
-                glm::mat4 viewModel = glm::mat4(glm::mat3(view));
-
-                glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-                m_shaderGeometryPass.bind();
-
-                glUniformMatrix4fv(m_hdrSkyBoxShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(viewModel));
-                glUniformMatrix4fv(m_hdrSkyBoxShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
-
-                mesh.drawBasic(m_shaderGeometryPass);
-
-            }
-
 
             GLuint PbrUBO;
 

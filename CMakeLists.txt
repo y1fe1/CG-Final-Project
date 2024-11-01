@@ -24,8 +24,6 @@ add_executable(Master_TechDemo
 	"src/Textures/cubeMapTexture.h"
 	"src/Textures/hdrTexture.cc"
 	"src/Textures/hdrTexture.h"
-	"src/Textures/ssaoBufferTexture.cc"
-	"src/Textures/ssaoBufferTexture.h"
 )
 
 target_compile_definitions(Master_TechDemo PRIVATE RESOURCE_ROOT="${CMAKE_CURRENT_LIST_DIR}/")
