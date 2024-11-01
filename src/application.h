@@ -6,6 +6,7 @@
 #include "camera.h"
 #include "Textures/cubeMapTexture.h"
 #include "Textures/hdrTexture.h"
+#include "Textures/ssaoBufferTexture.h"
 
 #define MAX_LIGHT_CNT 10
 
@@ -34,7 +35,8 @@ private:
 
     // Definition for SkyBox 
     bool envMapEnabled = false;
-
+    
+    #pragma region Skybox def
     // faces should follow this format
     std::vector<std::filesystem::path> faces = {
         std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "right.jpg"),
@@ -52,6 +54,9 @@ private:
 
     void generateSkyBox();
 
+    #pragma endregion
+
+    #pragma region HDR_map_def
     // Definition HDR cubemap settings
     bool hdrMapEnabled = false;
 
@@ -61,7 +66,6 @@ private:
     hdrTexture hdrTextureMap;
 
     cubeMapTex hdrCubeMap;
-    GLuint cubeVAO = 0, cubeVBO = 0;
 
     Shader m_hdrToCubeShader;
     Shader m_hdrSkyBoxShader;
@@ -74,9 +78,32 @@ private:
 
     Texture BRDFTexture;
     Shader m_brdfShader;
-    GLuint quadVAO = 0, quadVBO = 0;
 
     void generateHdrMap();
+    #pragma endregion
+
+    // extra vao to use
+    GLuint cubeVAO = 0, cubeVBO = 0;
+    GLuint quadVAO = 0, quadVBO = 0;
+
+    /// SSAO Defintions ///
+
+    bool ssaoEnabled;
+
+    // SSAO Processing Shader
+    Shader m_shaderGeometryPass;
+    Shader m_shaderLightingPass;
+    Shader m_shaderSSAO;
+    Shader m_shaderSSAOBlur;
+
+    GLuint gBuffer;
+    ssaoBufferTex gPos, gNor, gCol;
+
+    GLuint renderDepth;
+    
+    GLuint ssaoFBO, ssaoBlurFBO;
+    ssaoBufferTex ssaoColorBuff, ssaoColorBlurBuff;
+    ssaoBufferTex ssaoNoiseTex;
 
     // Definition for model Obejcts includeing texture and Material
     std::vector<GPUMesh> m_meshes;

@@ -24,6 +24,7 @@ DISABLE_WARNINGS_POP()
 #include <array>
 #include <iostream>
 #include <vector>
+#include <random>
 
 inline const int WIDTH = 1920;
 inline const int HEIGHT = 1080;
@@ -289,3 +290,50 @@ inline const float quadVertices[] = {
      1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
      1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
 };
+
+inline std::vector<glm::vec3> generateSSAOKernel(GLuint kernelSize = 64)
+{
+    std::vector<glm::vec3> ssaoKernel;
+    std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
+    std::default_random_engine generator;
+
+    for (unsigned int i = 0; i < kernelSize; ++i)
+    {
+        glm::vec3 sample(
+            randomFloats(generator) * 2.0f - 1.0f,
+            randomFloats(generator) * 2.0f - 1.0f,
+            randomFloats(generator)
+        );
+
+        sample = glm::normalize(sample);
+        sample *= randomFloats(generator);
+
+        float scale = float(i) / float(kernelSize);
+        scale = std::lerp(0.1f, 1.0f, scale * scale); // Scale to concentrate points closer to origin
+        sample *= scale;
+
+        ssaoKernel.push_back(sample);
+    }
+
+    return ssaoKernel;
+}
+
+inline std::vector<glm::vec3> generateSSAONoise(GLuint noiseSize = 16)
+{
+    std::vector<glm::vec3> ssaoNoise;
+    std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
+    std::default_random_engine generator;
+
+    for (unsigned int i = 0; i < noiseSize; i++)
+    {
+        // Generate random noise in the range [-1, 1] for x and y
+        glm::vec3 noise(
+            randomFloats(generator) * 2.0f - 1.0f,
+            randomFloats(generator) * 2.0f - 1.0f,
+            0.0f // Fixed z component
+        );
+        ssaoNoise.push_back(noise);
+    }
+
+    return ssaoNoise;
+}
