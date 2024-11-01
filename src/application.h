@@ -95,6 +95,9 @@ private:
 
     Material m_Material;
     PBRMaterial m_PbrMaterial;
+
+    GLuint PbrUBO;
+
     bool m_useMaterial = true;
     bool m_materialChangedByUser = false;
 
@@ -131,15 +134,15 @@ private:
     Minimap minimap;
 
     //Post-Process Shader
-    bool usePostProcess;
+    bool usePostProcess = false;
     void initPostProcess();
     void runPostProcess();
     void renderFullScreenQuad();
     GLuint framebufferPostProcess;
     GLuint texturePostProcess;
     GLuint depthbufferPostProcess;
-    const int WINDOW_WIDTH = 1024;
-    const int WINDOW_HEIGHT = 1024;
+    const int WINDOW_WIDTH = 1920;
+    const int WINDOW_HEIGHT = 1080;
 
 public:
     Application();

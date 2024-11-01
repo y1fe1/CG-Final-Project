@@ -269,8 +269,6 @@ void Application::update() {
             //glEnable(GL_BLEND); // Enable blending.
             //glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
-            GLuint PbrUBO;
-
             if (multiLightShadingEnabled) {
                 m_selShader = usePbrShading ? &m_pbrShader : &m_multiLightShader;
             }
@@ -363,7 +361,7 @@ void Application::update() {
             }
 
             genUboBufferObj(selectedLight, lightUBO);
-            mesh.draw(m_defaultShader);
+            mesh.draw(*m_selShader);
             renderMiniMap();
            	
             int lightsCnt = static_cast<int>(lights.size());
@@ -795,13 +793,18 @@ void Application::renderMiniMap() {
     glViewport(800, 800, 200, 200); // Make it to up-right
 
     // 使用小地图的视图矩阵和投影矩阵渲染场景
-    m_defaultShader.bind();
+    m_selShader->bind();
     const glm::mat4 mvpMatrix = minimap.projectionMatrix() * minimap.viewMatrix() * m_modelMatrix;
     glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
 
     // 渲染小地图内容
     for (GPUMesh& mesh : m_meshes) {
-        mesh.draw(m_defaultShader);
+        if (usePbrShading) {
+            mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
+        }
+        else {
+            mesh.draw(*m_selShader);
+        }
     }
 
     const glm::mat4 minimapVP = minimap.projectionMatrix() * minimap.viewMatrix() * m_modelMatrix;
