@@ -4,8 +4,8 @@
 #include <framework/trackball.h>
 
 #include "camera.h"
-#include "cubeMapTexture.h"
-#include "hdrTexture.h"
+#include "Textures/cubeMapTexture.h"
+#include "Textures/hdrTexture.h"
 
 #define MAX_LIGHT_CNT 10
 #include "minimap.h"
@@ -54,6 +54,8 @@ private:
 
     Shader m_skyBoxShader;
 
+    void generateSkyBox();
+
     // Definition HDR cubemap settings
     bool hdrMapEnabled = false;
 
@@ -67,6 +69,18 @@ private:
 
     Shader m_hdrToCubeShader;
     Shader m_hdrSkyBoxShader;
+
+    cubeMapTex hdrIrradianceMap;
+    Shader m_hdrToIrradianceShader;
+
+    cubeMapTex hdrPrefilteredMap;
+    Shader m_hdrPrefilterShader;
+
+    Texture BRDFTexture;
+    Shader m_brdfShader;
+    GLuint quadVAO = 0, quadVBO = 0;
+
+    void generateHdrMap();
 
     // Definition for model Obejcts includeing texture and Material
     std::vector<GPUMesh> m_meshes;

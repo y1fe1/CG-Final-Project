@@ -5,7 +5,6 @@ precision highp float;
 #define MAX_LIGHT_CNT 10
 #define PI 3.1415926535897932384626433832795
 
-// Not Used yet will be combined with the original shader
 // Implementation of PBR Shading
 
 // PBR Material 
@@ -64,6 +63,11 @@ uniform bool useMaterial;
 
 uniform vec3 ambientColor;
 
+uniform bool hdrEnvMapEnabled;
+uniform samplerCube irradianceMap;
+uniform samplerCube prefilteredMap;
+uniform sampler2D brdfLUT;
+
 in vec3 fragPosition;
 in vec3 fragNormal;
 in vec2 fragTexCoord;
@@ -121,6 +125,12 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }  
+
+// introduce roughness for Fresnel-Schlick equation
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
+{
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}   
 
 //GGX Distribution
 float DistributionGGX(vec3 normal, vec3 halfDir, float roughness)
@@ -186,6 +196,9 @@ void main()
     float Roughness = roughness;
     float Ao = ao;
 
+    vec3 ambient = vec3(0.03);
+    vec3 irradiance = vec3(0.0);
+    vec3 diffuse = vec3(0.0);
     if (hasTexCoords)       { 
         //fragColor = vec4(texture(colorMap, fragTexCoord).rgb, 1);
 
@@ -217,6 +230,7 @@ void main()
 
     vec3 Specular = vec3(0.0f);
     vec3 viewDir = normalize(viewPos - fragPosition);
+    vec3 reflectDir = (-viewDir,normal);
 
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, Albedo, Metallic);
@@ -242,7 +256,9 @@ void main()
             vec3 F = fresnelSchlick(max(dot(halfDir, viewDir), 0.0), F0);
 
             vec3 kS = F;
-            vec3 kD = vec3(1.0)-kS;
+            vec3 kD = vec3(0.0);
+
+            kD = vec3(1.0)-kS;
             kD *= 1.0 - Metallic;
 
             vec3 numerator    = NDF * G * F;
@@ -255,9 +271,27 @@ void main()
             //finalColor += radiance;
         }
 
-        vec3 ambient = vec3(0.03) * Albedo * Ao;
-        vec3 color = ambient + finalColor;
-	    
+        vec3 color = vec3(0.0);
+
+        if(!hdrEnvMapEnabled){
+            ambient = ambient * Albedo * Ao;
+        } 
+
+        else {
+            vec3 kS = fresnelSchlickRoughness(max(dot(normal, viewDir), 0.0), F0, Roughness); 
+            vec3 kD = vec3(1.0)-kS;
+            irradiance = texture(irradianceMap, normal).rgb;
+            diffuse = irradiance * Albedo;
+
+            const float MAX_REFLECTION_LOD = 4.0;
+            vec3 perfilteredColor = textureLod(prefilteredMap,reflectDir, Roughness * MAX_REFLECTION_LOD).rgb; 
+            vec2 brdf = texture(brdfLUT, vec2(max(dot(normal, viewDir), 0.0), Roughness)).rg;
+            vec3 specular = perfilteredColor * (kS * brdf.x + brdf.y);
+
+            ambient = (kD * diffuse + specular) * Ao;
+        }
+
+        color = ambient + finalColor;
         // gamma correction
         float gamma = 2.2f;
 

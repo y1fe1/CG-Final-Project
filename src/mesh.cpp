@@ -161,7 +161,6 @@ void GPUMesh::draw(const Shader& drawingShader, GLuint& drawingUBO, bool multiLi
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
 
-    glViewport(0, 0, WIDTH, HEIGHT);
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
 
     glBindVertexArray(0);
@@ -176,7 +175,6 @@ void GPUMesh::drawPBR(const Shader& drawingShader, GLuint& PbrUbo, GLuint& drawi
     // Draw the mesh's triangles
     glBindVertexArray(m_vao);
 
-    glViewport(0, 0, WIDTH, HEIGHT);
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
 
     glBindVertexArray(0);
@@ -187,7 +185,6 @@ void GPUMesh::drawBasic(const Shader& drawingShader)
     // Draw the mesh's triangles
     glBindVertexArray(m_vao);
 
-    glViewport(0, 0, WIDTH, HEIGHT);
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
 
     glBindVertexArray(0);

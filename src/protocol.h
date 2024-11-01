@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mesh.h"
-#include "texture.h"
+#include "Textures/texture.h"
 // Always include window first (because it includes glfw, which includes GL which needs to be included AFTER glew).
 // Can't wait for modules to fix this stuff...
 #include <framework/disable_all_warnings.h>
@@ -25,8 +25,8 @@ DISABLE_WARNINGS_POP()
 #include <iostream>
 #include <vector>
 
-inline const int WIDTH = 1200;
-inline const int HEIGHT = 800;
+inline const int WIDTH = 1920;
+inline const int HEIGHT = 1080;
 
 struct textureLoadingException : public std::runtime_error {
     using std::runtime_error::runtime_error;
@@ -262,3 +262,30 @@ inline void renderHDRCubeMap(GLuint& cubeVAO, GLuint& cubeVBO, const float* vert
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);
 }
+
+inline void renderQuad(GLuint& quadVAO, GLuint& quadVBO, const float* vertices, size_t vertexCount) {
+    if (quadVAO == 0)
+    {
+        // setup plane VAO
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, vertexCount * sizeof(vertices), vertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    }
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+}
+
+inline const float quadVertices[] = {
+    // positions        // texture Coords
+    -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+    -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+     1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+     1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+};

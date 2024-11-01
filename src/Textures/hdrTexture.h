@@ -1,15 +1,12 @@
 #pragma once
 
-#include <filesystem>
-#include <framework/opengl_includes.h>
-
-#include "texture.h"
-
 #include <framework/disable_all_warnings.h>
 DISABLE_WARNINGS_PUSH()
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 DISABLE_WARNINGS_POP()
+
+#include "absTexture.h"
 
 #define HDR_PATH "resources/texture/HDR/"
 
@@ -19,18 +16,15 @@ struct hdrTexLoadingException : public std::runtime_error {
 };
 
 
-class hdrTexture {
+class hdrTexture: public abstractTexture{
 public:
     hdrTexture();
     hdrTexture(std::filesystem::path filePath);
+
     hdrTexture(const hdrTexture&) = delete;
     hdrTexture& operator=(const hdrTexture&) = delete;
 
-    void bind(GLint textureSlot);
-
-private:
-    static constexpr GLuint INVALID = 0xFFFFFFFF;
-    GLuint m_texture{ INVALID };
+    void bind(GLint textureSlot) override;
 };
 
 // HDR set up projection and view matrices for capturing data onto the 6 cubemap face directions
