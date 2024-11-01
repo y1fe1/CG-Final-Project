@@ -40,6 +40,11 @@ struct Light {
     bool is_spotlight;
     bool has_texture;
     vec2 _UNUSE_PADDING3;
+
+    float linear;
+    float _UNUSE_PADDING4;  
+    float quadratic;
+    float radius;
 };
 
 layout(std140) uniform lights{

@@ -2,9 +2,6 @@
 
 #define MAX_LIGHT_CNT 10
 
-// Not Used yet will be combined with the original shader
-// temporary for testing
-
 // Material Setting
 layout(std140) uniform Material // Must match the GPUMaterial defined in src/mesh.h
 {
@@ -36,6 +33,11 @@ struct Light {
     bool is_spotlight;
     bool has_texture;
     vec2 _UNUSE_PADDING3;
+
+    float linear;
+    float _UNUSE_PADDING4;  
+    float quadratic;
+    float radius;
 };
 
 layout(std140) uniform lights{
@@ -104,9 +106,9 @@ float shadowFactorCal(int lightIdx,vec2 shadowMapCoord, float fragLightDepth){
     return shadowFactor;
 }
 
-float getLightAttenuationFactor(vec3 lightDir) {
+float getLightAttenuationFactor(Light curLight,vec3 lightDir) {
     float dist = length(lightDir);
-    float attenuation = 1.0 / (dist * dist); // Simple quadratic falloff
+    float attenuation = 1.0 / (1.0+ curLight.linear * dist + curLight.quadratic*dist * dist); // Simple quadratic falloff
 
     // Clamp the attenuation to avoid excessively bright values at close distances
     return clamp(attenuation, 0.0, 1.0);
@@ -150,6 +152,7 @@ void main()
     { 
         for (int idx = 0; idx < LightCount; idx++){
 
+    
             vec4 fragLightCoord = lightMVPs[idx] * vec4(fragPosition, 1.0);
             // Convert to normalized device coordinates
             fragLightCoord.xyz /= fragLightCoord.w; // Homogeneous divide
@@ -165,6 +168,7 @@ void main()
             vec2 shadowMapCoord = fragLightCoord.xy;
 
             float shadowFactor = (shadowEnabled)? shadowFactorCal(idx,shadowMapCoord,fragLightDepth) : 0.0f;
+        
 
             vec3 lightDir = normalize(LightList[idx].position - fragPosition);
             
@@ -181,7 +185,7 @@ void main()
             }
         
             // Calculate the light attenuation factor based on distance
-            float lightAttenuationFactor = getLightAttenuationFactor(lightDir);
+            float lightAttenuationFactor = getLightAttenuationFactor(LightList[idx],lightDir);
 
             //vec3 finalColor = (ambient + diffuse + Specular);
             finalColor = (diffuse + Specular) * LightList[idx].color * (1-shadowFactor) * lightAttenuationFactor;

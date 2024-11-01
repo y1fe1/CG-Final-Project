@@ -61,6 +61,8 @@ inline std::array<const char*, 2> materialModelNames{ "normal","PBR Material" };
 
 
     #pragma region LightRelated
+
+// point light
 struct Light {
     glm::vec3 position;
     float _UNUSE_PADDING0;
@@ -75,6 +77,12 @@ struct Light {
     bool has_texture;
     uint8_t _UNUSE_PADDING3[2];
 
+    //light attenuation factor
+    float linear = 0.7f;
+    float _UNUSE_PADDING4;  
+    float quadratic = 1.8f;
+    float radius = 0.0f;  // only be enabled if this is a cube light
+
     Light(): 
         position(glm::vec3(0.0f)), _UNUSE_PADDING0(0.0f),
 
@@ -82,17 +90,21 @@ struct Light {
 
         direction(-glm::vec3(0.0f, 0.0f, 1.0f)), _UNUSE_PADDING2(0.0f),
 
-        is_spotlight(false), has_texture(false),_UNUSE_PADDING3{ 0, 0 } 
+        is_spotlight(false), has_texture(false),_UNUSE_PADDING3{ 0, 0 },
+
+        linear(0.7f), _UNUSE_PADDING4(0.0f), quadratic(1.8f), radius(0.0f)
     {}
 
-    Light(glm::vec3 pos, glm::vec3 col, glm::vec3 dir, bool spotlight, bool texture):
+    Light(glm::vec3 pos, glm::vec3 col, glm::vec3 dir, bool spotlight, bool texture,
+        float lin = 0.7f, float quad = 1.8f):
         position(pos), _UNUSE_PADDING0(0.0f),
 
         color(col), _UNUSE_PADDING1(0.0f),
 
         direction(dir), _UNUSE_PADDING2(0.0f),
 
-        is_spotlight(spotlight), has_texture(texture),_UNUSE_PADDING3{ 0, 0 } 
+        is_spotlight(spotlight), has_texture(texture),_UNUSE_PADDING3{ 0, 0 },
+        linear(lin), _UNUSE_PADDING4(0.0f), quadratic(quad), radius(0.0f)
     {}
     //std::shared_ptr<Texture> texture; light Texture not used yet
 };
@@ -112,10 +124,11 @@ struct shadowLoadingException : public std::runtime_error {
 struct shadowSetting {
     alignas(4) bool shadowEnabled = 0;  // 4 bytes
     alignas(4) bool pcfEnabled = 0;     // 4 bytes
-    alignas(4) bool _UNUSE_PADDING0 = 0; // Additional 8 bytes for 16-byte alignment
-    alignas(4) bool _UNUSE_PADDING1 = 0;
+    alignas(4) bool _UNUSE_PADDING6 = 0; // Additional 8 bytes for 16-byte alignment
+    alignas(4) bool _UNUSE_PADDING7 = 0;
 };
 
+// this should be moved and defiend as a child class of abstract texture
 struct ShadowTexture {
 public:
     ShadowTexture() {

@@ -46,11 +46,11 @@ Application::Application()
         { glm::vec3(-1, 3, 2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
     );
 
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/normal.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/albedo.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/metallic.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/roughness.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/ao.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/normal.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/albedo.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/metallic.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/roughness.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/ao.png")));
 
     //lights.push_back(
     //    { glm::vec3(2, 1, 2), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
@@ -94,66 +94,57 @@ Application::Application()
     // gen HDR map
     generateHdrMap();
 
-    try 
-    {
-        glGenFramebuffers(1, &gBuffer);
-        glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+    // deferred rendering pipeline generation
+    if (GL_FALSE) {
+        try
+        {
+            glGenFramebuffers(1, &gBuffer);
+            glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
 
-        if(gPos.gBufferCode == SSAO_GBUFFER_POS)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPos.getTextureRef(), 0);
-        if(gNor.gBufferCode == SSAO_GBUFFER_NOR)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNor.getTextureRef(), 0);
-        if(gCol.gBufferCode == SSAO_GBUFFER_COL)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gCol.getTextureRef(), 0);
+            if (gPos.gBufferCode == SSAO_GBUFFER_POS)
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPos.getTextureRef(), 0);
+            if (gNor.gBufferCode == SSAO_GBUFFER_NOR)
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNor.getTextureRef(), 0);
+            if (gCol.gBufferCode == SSAO_GBUFFER_COL)
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gCol.getTextureRef(), 0);
 
-        GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-        glDrawBuffers(3, attachments);
+            GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+            glDrawBuffers(3, attachments);
 
-        // render buffer
-        glGenRenderbuffers(1, &renderDepth);
-        glBindRenderbuffer(GL_RENDERBUFFER, renderDepth);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WIDTH, HEIGHT);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderDepth);
+            // render buffer
+            glGenRenderbuffers(1, &renderDepth);
+            glBindRenderbuffer(GL_RENDERBUFFER, renderDepth);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WIDTH, HEIGHT);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderDepth);
 
-        // finally check if framebuffer is complete
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-            std::cout << "Framebuffer not complete!" << std::endl;
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            // finally check if framebuffer is complete
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+                std::cout << "Framebuffer not complete!" << std::endl;
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        glGenFramebuffers(1, &ssaoFBO);  
-        glGenFramebuffers(1, &ssaoBlurFBO);
-        glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
+            //genSSAOFrameBuffer();
 
-        if(ssaoColorBuff.gBufferCode == SSAO_COLOR_BUFF)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBuff.getTextureRef(), 0);
+            lights.clear();
+            for (GLint i = 0; i < MAX_LIGHT_CNT; ++i) {
 
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-            std::cout << "SSAO Framebuffer not complete!" << std::endl;
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                float xPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 3.0);
+                float yPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 4.0);
+                float zPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 3.0);
+                // also calculate random color
+                float rColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.)
+                float gColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.)
+                float bColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.)
 
-        glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
-        if (ssaoColorBlurBuff.gBufferCode == SSAO_COLOR_BLUR)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBlurBuff.getTextureRef(), 0);
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-            std::cout << "SSAO Framebuffer not complete!" << std::endl;
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
-        std::default_random_engine generator;
-
-        // generate sample kernel
-        std::vector<glm::vec3> ssaoKernel = generateSSAOKernel();
-
-        // generate noise
-        std::vector<glm::vec3> ssaoNoise = generateSSAONoise();
-
-        ssaoNoiseTex = std::move(ssaoBufferTex(SSAO_NOISE_TEX, ssaoNoise));
-
-
-    }
-    catch (std::runtime_error e) 
-    {
-        std::cerr << e.what() << std::endl;
+                auto lightPos = glm::vec3(xPos, yPos, zPos);
+                lights.push_back(
+                    { lightPos,glm::vec3(rColor, gColor, bColor),-lightPos,false,false }
+                );
+            }
+        }
+        catch (std::runtime_error e)
+        {
+            std::cerr << e.what() << std::endl;
+        }
     }
 
     // then before rendering, configure the viewport to the original framebuffer's screen dimensions
@@ -205,8 +196,8 @@ Application::Application()
         // set up light Shader
         ShaderBuilder lightShaderBuilder;
         lightShaderBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/light_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/light_frag.glsl");
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/lights/light_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/lights/light_frag.glsl");
         m_lightShader = lightShaderBuilder.build();
 
         // setup skybox shader
@@ -230,22 +221,30 @@ Application::Application()
 
         ShaderBuilder shaderLightingPassBuilder;
         shaderLightingPassBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/light_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/light_frag.glsl");
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/lights/deferred_light_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/lights/light_frag.glsl");
         m_shaderLightingPass = shaderLightingPassBuilder.build();
 
+
+        ShaderBuilder deferredLightShaderBuilder;
+        deferredLightShaderBuilder
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/lights/deferred_light_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/lights/light_frag.glsl");
+        m_deferredLightShader = deferredLightShaderBuilder.build();
+
+        /*
         ShaderBuilder ssaoBuilder;
         ssaoBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/light_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/light_frag.glsl");
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/lights/light_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/lights/light_frag.glsl");
         m_shaderSSAO = ssaoBuilder.build();
 
         ShaderBuilder ssaoBlurBuilder;
         ssaoBlurBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/light_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/light_frag.glsl");
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/lights/light_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/lights/light_frag.glsl");
         m_shaderSSAOBlur = ssaoBuilder.build();
-        
+        */
     }
     catch (ShaderLoadingException e) {
         std::cerr << e.what() << std::endl;
@@ -693,6 +692,38 @@ void Application::generateHdrMap()
     catch (std::runtime_error e) {
         std::cerr << e.what() << std::endl;
     }
+}
+
+void Application::genSSAOFrameBuffer()
+{
+    glGenFramebuffers(1, &ssaoFBO);
+    glGenFramebuffers(1, &ssaoBlurFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
+
+    if (ssaoColorBuff.gBufferCode == SSAO_COLOR_BUFF)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBuff.getTextureRef(), 0);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "SSAO Framebuffer not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
+    if (ssaoColorBlurBuff.gBufferCode == SSAO_COLOR_BLUR)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBlurBuff.getTextureRef(), 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "SSAO Framebuffer not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
+    std::default_random_engine generator;
+
+    // generate sample kernel
+    std::vector<glm::vec3> ssaoKernel = generateSSAOKernel();
+
+    // generate noise
+    std::vector<glm::vec3> ssaoNoise = generateSSAONoise();
+
+    ssaoNoiseTex = std::move(ssaoBufferTex(SSAO_NOISE_TEX, ssaoNoise));
 }
 
 void Application::imgui() {

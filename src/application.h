@@ -88,11 +88,14 @@ private:
 
     /// SSAO Defintions ///
 
-    bool ssaoEnabled;
+    bool ssaoEnabled = false;
 
     // SSAO Processing Shader
     Shader m_shaderGeometryPass;
     Shader m_shaderLightingPass;
+
+    Shader m_deferredLightShader;
+
     Shader m_shaderSSAO;
     Shader m_shaderSSAOBlur;
 
@@ -101,9 +104,12 @@ private:
 
     GLuint renderDepth;
     
+    // unused
     GLuint ssaoFBO, ssaoBlurFBO;
     ssaoBufferTex ssaoColorBuff, ssaoColorBlurBuff;
     ssaoBufferTex ssaoNoiseTex;
+
+    void genSSAOFrameBuffer();
 
     // Definition for model Obejcts includeing texture and Material
     std::vector<GPUMesh> m_meshes;
