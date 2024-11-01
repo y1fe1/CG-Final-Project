@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mesh.h"
-#include "texture.h"
+#include "Textures/texture.h"
 // Always include window first (because it includes glfw, which includes GL which needs to be included AFTER glew).
 // Can't wait for modules to fix this stuff...
 #include <framework/disable_all_warnings.h>

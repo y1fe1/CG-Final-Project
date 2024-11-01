@@ -1,13 +1,11 @@
 #pragma once
+
 #include <framework/disable_all_warnings.h>
 DISABLE_WARNINGS_PUSH()
 #include <glm/vec3.hpp>
 DISABLE_WARNINGS_POP()
-#include <exception>
-#include <filesystem>
-#include <framework/opengl_includes.h>
 
-#include "texture.h"
+#include "absTexture.h"
 
 #define SKYBOX_PATH "resources/texture/skybox/"
 
@@ -21,7 +19,7 @@ struct cubeMapLoadingException : public std::runtime_error {
 };
 
 
-class cubeMapTex {
+class cubeMapTex: public abstractTexture{
 public:
 	cubeMapTex(std::vector<std::filesystem::path> filePaths);
 
@@ -30,13 +28,7 @@ public:
 	cubeMapTex(const cubeMapTex&) = delete;
 	cubeMapTex& operator=(const cubeMapTex&) = delete;
 
-	void bind(GLint textureSlot);
-
-	GLuint& getTextureRef();
-
-private:
-	static constexpr GLuint INVALID = 0xFFFFFFFF;
-	GLuint m_texture{ INVALID };
+	void bind(GLint textureSlot) override;
 };
 
 

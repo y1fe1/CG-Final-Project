@@ -81,176 +81,10 @@ Application::Application()
             onMouseReleased(button, mods);
         });
 
-    // === Create SkyBox Vertices ===
+    // generate env maps
+    generateSkyBox();
 
-    glEnable(GL_DEPTH_TEST);
-
-    try {
-        glGenVertexArrays(1, &skyboxVAO);
-        glGenBuffers(1, &skyboxVBO);
-        glBindVertexArray(skyboxVAO);
-
-        glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
-
-        // Set vertex attribute pointers
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-
-        glBindVertexArray(0);
-    }
-
-    catch (std::runtime_error e) {
-        std::cerr << e.what() << std::endl;
-    }
-
-    // === Create HDR FrameBuffer ===
-    glDepthFunc(GL_LEQUAL);
-
-    try {
-        glGenFramebuffers(1, &captureFBO);
-        glGenRenderbuffers(1, &captureRBO);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 1024, 1024);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
-
-        // initialize hdrTexMap should be here
-
-        // init cube to render hdr map
-    
-        // This Shader convert HDR Texture we got and put it onto the hdr_cube_map
-        ShaderBuilder hdrToCubeMapShaderBuilder;
-        hdrToCubeMapShaderBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/hdr_to_cube_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_to_cube_frag.glsl");
-        m_hdrToCubeShader = hdrToCubeMapShaderBuilder.build();
-
-        m_hdrToCubeShader.bind();
-        glUniformMatrix4fv(m_hdrToCubeShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(captureProjection));
-
-        hdrTextureMap.bind(GL_TEXTURE0);
-        glUniform1i(m_hdrToCubeShader.getUniformLocation("equirectangularMap"), 0);
-
-        glViewport(0, 0, 1024, 1024);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-        for (GLuint i = 0; i < 6; ++i) 
-        {
-            glUniformMatrix4fv(m_hdrToCubeShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(captureViews[i]));
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, hdrCubeMap.getTextureRef(), 0);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-            renderHDRCubeMap(cubeVAO, cubeVBO, hdrMapVertices, 288);
-        }   
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        //// let OpenGL generate mipmaps from first mip face (combatting visible dots artifact)
-        //glBindFramebuffer(GL_TEXTURE_CUBE_MAP, hdrCubeMap.getTextureRef());
-        //glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-        //glBindFramebuffer(GL_TEXTURE_CUBE_MAP, 0);
-
-        // integral convolution to create hdr irridiance map
-
-        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);  // rebuild buffer for irridiance map
-
-        ShaderBuilder hdrToIrradianceShaderBuilder;
-        hdrToIrradianceShaderBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/hdr_to_cube_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_cube_to_irradiance_frag.glsl");
-        m_hdrToIrradianceShader = hdrToIrradianceShaderBuilder.build();
-
-        m_hdrToIrradianceShader.bind();
-        glUniformMatrix4fv(m_hdrToCubeShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(captureProjection));
-
-        hdrCubeMap.bind(GL_TEXTURE0);
-        glUniform1i(m_hdrToIrradianceShader.getUniformLocation("environmentMap"), 0);
-
-        glViewport(0, 0, 32, 32);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-        for (GLuint i = 0; i < 6; ++i)
-        {
-            glUniformMatrix4fv(m_hdrToIrradianceShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(captureViews[i]));
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, hdrIrradianceMap.getTextureRef(), 0);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-            renderHDRCubeMap(cubeVAO, cubeVBO, hdrMapVertices, 288);
-        }
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-
-        // enable seamless cubemap sampling for lower mip levels in the pre-filter map.
-        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-
-        // generate hdr prefiltered Map
-        ShaderBuilder hdrPrefilteredShaderBuilder;
-        hdrPrefilteredShaderBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/hdr_to_cube_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_cube_to_prefilter_frag.glsl");
-        m_hdrPrefilterShader = hdrPrefilteredShaderBuilder.build();
-
-        m_hdrPrefilterShader.bind();
-
-        glUniformMatrix4fv(m_hdrPrefilterShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(captureProjection));
-
-        hdrCubeMap.bind(GL_TEXTURE0);
-        glUniform1i(m_hdrPrefilterShader.getUniformLocation("environmentMap"), 0);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-        GLuint maxMipLevels = 5;
-        for (GLuint mip = 0; mip < maxMipLevels; ++mip)
-        {
-            // reisze framebuffer according to mip-level size.
-            GLuint mipWidth = static_cast<GLuint>(128 * std::pow(0.5, mip));
-            GLuint mipHeight = static_cast<GLuint>(128 * std::pow(0.5, mip));
-            glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
-            glViewport(0, 0, mipWidth, mipHeight);
-
-            float roughness = (float)mip / (float)(maxMipLevels - 1);
-            glUniform1i(m_hdrPrefilterShader.getUniformLocation("roughness"), roughness);
-
-            for (GLuint i = 0; i < 6; ++i)
-            {
-                glUniformMatrix4fv(m_hdrPrefilterShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(captureViews[i]));
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, hdrPrefilteredMap.getTextureRef(), mip);
-
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-                renderHDRCubeMap(cubeVAO, cubeVBO, hdrMapVertices, 288);
-            }
-        }
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-
-        // Gen BRDF Texture
-        ShaderBuilder brdfShaderBuilder;
-        brdfShaderBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/texture_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/brdf_frag.glsl");
-        m_brdfShader = brdfShaderBuilder.build();
-
-        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, BRDFTexture.getTextureRef(), 0);
-
-        glViewport(0, 0, 512, 512);
-
-        m_brdfShader.bind();
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        renderQuad(quadVAO,quadVBO,quadVertices,20);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    }
-
-    catch (std::runtime_error e) {
-        std::cerr << e.what() << std::endl;
-    }
+    generateHdrMap();
 
     // then before rendering, configure the viewport to the original framebuffer's screen dimensions
     glm::ivec2 windowSizes = m_window.getWindowSize();
@@ -569,6 +403,183 @@ void Application::update() {
         glEnable(GL_DEPTH_TEST);*/
 
         m_window.swapBuffers();
+    }
+}
+
+void Application::generateSkyBox()
+{
+    // === Create SkyBox Vertices ===
+
+    glEnable(GL_DEPTH_TEST);
+
+    try {
+        glGenVertexArrays(1, &skyboxVAO);
+        glGenBuffers(1, &skyboxVBO);
+        glBindVertexArray(skyboxVAO);
+
+        glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
+
+        // Set vertex attribute pointers
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+        glBindVertexArray(0);
+    }
+
+    catch (std::runtime_error e) {
+        std::cerr << e.what() << std::endl;
+    }
+}
+
+void Application::generateHdrMap()
+{
+    // === Create HDR FrameBuffer ===
+    glDepthFunc(GL_LEQUAL);
+
+    try {
+        glGenFramebuffers(1, &captureFBO);
+        glGenRenderbuffers(1, &captureRBO);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 1024, 1024);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+
+        // initialize hdrTexMap should be here
+
+        // init cube to render hdr map
+
+        // This Shader convert HDR Texture we got and put it onto the hdr_cube_map
+        ShaderBuilder hdrToCubeMapShaderBuilder;
+        hdrToCubeMapShaderBuilder
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/hdr_to_cube_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_to_cube_frag.glsl");
+        m_hdrToCubeShader = hdrToCubeMapShaderBuilder.build();
+
+        m_hdrToCubeShader.bind();
+        glUniformMatrix4fv(m_hdrToCubeShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(captureProjection));
+
+        hdrTextureMap.bind(GL_TEXTURE0);
+        glUniform1i(m_hdrToCubeShader.getUniformLocation("equirectangularMap"), 0);
+
+        glViewport(0, 0, 1024, 1024);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        for (GLuint i = 0; i < 6; ++i)
+        {
+            glUniformMatrix4fv(m_hdrToCubeShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(captureViews[i]));
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, hdrCubeMap.getTextureRef(), 0);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            renderHDRCubeMap(cubeVAO, cubeVBO, hdrMapVertices, 288);
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        //// let OpenGL generate mipmaps from first mip face (combatting visible dots artifact)
+        //glBindFramebuffer(GL_TEXTURE_CUBE_MAP, hdrCubeMap.getTextureRef());
+        //glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+        //glBindFramebuffer(GL_TEXTURE_CUBE_MAP, 0);
+
+        // integral convolution to create hdr irridiance map
+
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);  // rebuild buffer for irridiance map
+
+        ShaderBuilder hdrToIrradianceShaderBuilder;
+        hdrToIrradianceShaderBuilder
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/hdr_to_cube_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_cube_to_irradiance_frag.glsl");
+        m_hdrToIrradianceShader = hdrToIrradianceShaderBuilder.build();
+
+        m_hdrToIrradianceShader.bind();
+        glUniformMatrix4fv(m_hdrToCubeShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(captureProjection));
+
+        hdrCubeMap.bind(GL_TEXTURE0);
+        glUniform1i(m_hdrToIrradianceShader.getUniformLocation("environmentMap"), 0);
+
+        glViewport(0, 0, 32, 32);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        for (GLuint i = 0; i < 6; ++i)
+        {
+            glUniformMatrix4fv(m_hdrToIrradianceShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(captureViews[i]));
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, hdrIrradianceMap.getTextureRef(), 0);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            renderHDRCubeMap(cubeVAO, cubeVBO, hdrMapVertices, 288);
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+        // enable seamless cubemap sampling for lower mip levels in the pre-filter map.
+        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+        // generate hdr prefiltered Map
+        ShaderBuilder hdrPrefilteredShaderBuilder;
+        hdrPrefilteredShaderBuilder
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/hdr_to_cube_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_cube_to_prefilter_frag.glsl");
+        m_hdrPrefilterShader = hdrPrefilteredShaderBuilder.build();
+
+        m_hdrPrefilterShader.bind();
+
+        glUniformMatrix4fv(m_hdrPrefilterShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(captureProjection));
+
+        hdrCubeMap.bind(GL_TEXTURE0);
+        glUniform1i(m_hdrPrefilterShader.getUniformLocation("environmentMap"), 0);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        GLuint maxMipLevels = 5;
+        for (GLuint mip = 0; mip < maxMipLevels; ++mip)
+        {
+            // reisze framebuffer according to mip-level size.
+            GLuint mipWidth = static_cast<GLuint>(128 * std::pow(0.5, mip));
+            GLuint mipHeight = static_cast<GLuint>(128 * std::pow(0.5, mip));
+            glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
+            glViewport(0, 0, mipWidth, mipHeight);
+
+            float roughness = (float)mip / (float)(maxMipLevels - 1);
+            glUniform1i(m_hdrPrefilterShader.getUniformLocation("roughness"), roughness);
+
+            for (GLuint i = 0; i < 6; ++i)
+            {
+                glUniformMatrix4fv(m_hdrPrefilterShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(captureViews[i]));
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, hdrPrefilteredMap.getTextureRef(), mip);
+
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                renderHDRCubeMap(cubeVAO, cubeVBO, hdrMapVertices, 288);
+            }
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+        // Gen BRDF Texture
+        ShaderBuilder brdfShaderBuilder;
+        brdfShaderBuilder
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/texture_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/brdf_frag.glsl");
+        m_brdfShader = brdfShaderBuilder.build();
+
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, BRDFTexture.getTextureRef(), 0);
+
+        glViewport(0, 0, 512, 512);
+
+        m_brdfShader.bind();
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        renderQuad(quadVAO, quadVBO, quadVertices, 20);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+    catch (std::runtime_error e) {
+        std::cerr << e.what() << std::endl;
     }
 }
 

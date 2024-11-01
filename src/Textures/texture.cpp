@@ -70,11 +70,9 @@ Texture::Texture(int textureGenCod)
     }
 }
 
-Texture::Texture(Texture&& other)
-    : m_texture(other.m_texture)
-{
-    other.m_texture = INVALID;
-}
+Texture::Texture(Texture&& other) noexcept
+    : abstractTexture(std::move(other))
+{}
 
 Texture::~Texture()
 {
@@ -88,8 +86,3 @@ void Texture::bind(GLint textureSlot)
     glBindTexture(GL_TEXTURE_2D, m_texture);
 }
 
-GLuint& Texture::getTextureRef()
-{
-    return m_texture;
-    // TODO: insert return statement here
-}
