@@ -90,8 +90,6 @@ Application::Application()
     glm::ivec2 windowSizes = m_window.getWindowSize();
     glViewport(0, 0, windowSizes.x, windowSizes.y);
 
-
-
     // === Create Material Texture if its valid path ===
     std::string textureFullPath = std::string(RESOURCE_ROOT) + texturePath;
     std::vector<Mesh> cpuMeshes = loadMesh(RESOURCE_ROOT "resources/sphere.obj"); //"resources/texture/Cerberus_by_Andrew_Maximov/Cerberus_LP.obj

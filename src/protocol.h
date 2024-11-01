@@ -25,8 +25,8 @@ DISABLE_WARNINGS_POP()
 #include <iostream>
 #include <vector>
 
-inline const int WIDTH = 1200;
-inline const int HEIGHT = 800;
+inline const int WIDTH = 1920;
+inline const int HEIGHT = 1080;
 
 struct textureLoadingException : public std::runtime_error {
     using std::runtime_error::runtime_error;
