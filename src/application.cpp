@@ -789,6 +789,8 @@ void Application::onMouseReleased(int button, int mods) {
 
 
 void Application::renderMiniMap() {
+    GLint previousVBO;
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &previousVBO);
 
     glViewport(800, 800, 200, 200); // Make it to up-right
 
@@ -816,6 +818,7 @@ void Application::renderMiniMap() {
     // 恢复主视口
     glViewport(0, 0, 1024, 1024);
     drawMiniMapBorder();
+    glBindBuffer(GL_ARRAY_BUFFER, previousVBO);
 }
 
 

@@ -162,6 +162,12 @@ void GPUMesh::draw(const Shader& drawingShader, GLuint& drawingUBO, bool multiLi
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
 
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
+    
+    GLenum err;
+    while ((err = glGetError()) != GL_NO_ERROR) {
+        std::cerr << "OpenGL Error: " << err << std::endl;
+    }
+
 
     glBindVertexArray(0);
 }
