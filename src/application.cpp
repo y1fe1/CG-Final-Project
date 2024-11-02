@@ -96,59 +96,6 @@ Application::Application()
     // gen HDR map
     generateHdrMap();
 
-    // deferred rendering pipeline generation
-    if (TRUE) {
-        try
-        {
-            glGenFramebuffers(1, &gBuffer);
-            glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-
-            if (gPos.gBufferCode == SSAO_GBUFFER_POS)
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPos.getTextureRef(), 0);
-            if (gNor.gBufferCode == SSAO_GBUFFER_NOR)
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNor.getTextureRef(), 0);
-            if (gCol.gBufferCode == SSAO_GBUFFER_COL)
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gCol.getTextureRef(), 0);
-
-            GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-            glDrawBuffers(3, attachments);
-
-            // render buffer
-            glGenRenderbuffers(1, &renderDepth);
-            glBindRenderbuffer(GL_RENDERBUFFER, renderDepth);
-            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WIDTH, HEIGHT);
-            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderDepth);
-
-            // finally check if framebuffer is complete
-            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-                std::cout << "Framebuffer not complete!" << std::endl;
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-            //genSSAOFrameBuffer();
-
-            lights.clear();
-            for (GLint i = 0; i < MAX_LIGHT_CNT; ++i) {
-
-                float xPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 3.0);
-                float yPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 4.0);
-                float zPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 3.0);
-                // also calculate random color
-                float rColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.)
-                float gColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.)
-                float bColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.)
-
-                auto lightPos = glm::vec3(xPos, yPos, zPos);
-                lights.push_back(
-                    { lightPos,glm::vec3(rColor, gColor, bColor),-lightPos,false,false }
-                );
-            }
-        }
-        catch (std::runtime_error e)
-        {
-            std::cerr << e.what() << std::endl;
-        }
-    }
-
     // then before rendering, configure the viewport to the original framebuffer's screen dimensions
     glm::ivec2 windowSizes = m_window.getWindowSize();
     glViewport(0, 0, windowSizes.x, windowSizes.y);
@@ -215,31 +162,6 @@ Application::Application()
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_skybox_frag.glsl");
         m_hdrSkyBoxShader = hdrSkyBoxBuilder.build();
 
-        ShaderBuilder shaderGeometryPassBuilder;
-        shaderGeometryPassBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/deferred_render/gGeo_shader_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/deferred_render/gGeo_shader_frag.glsl");
-        m_shaderGeometryPass = shaderGeometryPassBuilder.build();
-
-        ShaderBuilder shaderLightingPassBuilder;
-        shaderLightingPassBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/deferred_render/deferred_gLight_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/deferred_render/deferred_gLight_frag.glsl");
-        m_shaderLightingPass = shaderLightingPassBuilder.build();
-
-
-        ShaderBuilder deferredLightShaderBuilder;
-        deferredLightShaderBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/lights/deferred_light_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/lights/light_frag.glsl");
-        m_deferredLightShader = deferredLightShaderBuilder.build();
-
-        ShaderBuilder deferredFBOdebugShaderBuilder;
-        deferredFBOdebugShaderBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/deferred_render/deferred_fbo_debug_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/deferred_render/deferred_fbo_debug_frag.glsl");
-        m_deferredDebugShader = deferredFBOdebugShaderBuilder.build();
-
         /*
         ShaderBuilder ssaoBuilder;
         ssaoBuilder
@@ -278,7 +200,7 @@ void Application::update() {
         //selectedCamera->updateInput();
         m_viewMatrix = selectedCamera->viewMatrix();
 
-        //glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+        glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 
         glClearDepth(1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -346,10 +268,12 @@ void Application::update() {
             // ssao will set a completely different render pipeline
             if (ssaoEnabled) 
             {
-                
+                genDeferredRenderBuffer(defRenderBufferGenerated);
+
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
                 m_selShader = &m_shaderGeometryPass;
+
                 // GeoMetryPass
                 glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
                 //glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -440,6 +364,16 @@ void Application::update() {
 
             else 
             {
+                lights.clear();
+
+                // lights must be initialized here since light is still struct not class
+                lights.push_back(
+                    { glm::vec3(1, 3, -2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
+                );
+
+                lights.push_back(
+                    { glm::vec3(-1, 3, 2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
+                );
 
                 GLuint PbrUBO;
 
@@ -783,6 +717,96 @@ void Application::generateHdrMap()
     }
 }
 
+// generate deferred rendering buffer before the pipeline begin, this should be only excuted once
+void Application::genDeferredRenderBuffer(bool& defRenderBufferGenerated)
+{
+    // deferred rendering pipeline generation
+    if (!defRenderBufferGenerated) {
+        try
+        {
+            ShaderBuilder shaderGeometryPassBuilder;
+            shaderGeometryPassBuilder
+                .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/deferred_render/gGeo_shader_vert.glsl")
+                .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/deferred_render/gGeo_shader_frag.glsl");
+            m_shaderGeometryPass = shaderGeometryPassBuilder.build();
+
+            ShaderBuilder shaderLightingPassBuilder;
+            shaderLightingPassBuilder
+                .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/deferred_render/deferred_gLight_vert.glsl")
+                .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/deferred_render/deferred_gLight_frag.glsl");
+            m_shaderLightingPass = shaderLightingPassBuilder.build();
+
+
+            ShaderBuilder deferredLightShaderBuilder;
+            deferredLightShaderBuilder
+                .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/lights/deferred_light_vert.glsl")
+                .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/lights/light_frag.glsl");
+            m_deferredLightShader = deferredLightShaderBuilder.build();
+
+            ShaderBuilder deferredFBOdebugShaderBuilder;
+            deferredFBOdebugShaderBuilder
+                .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/deferred_render/deferred_fbo_debug_vert.glsl")
+                .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/deferred_render/deferred_fbo_debug_frag.glsl");
+            m_deferredDebugShader = deferredFBOdebugShaderBuilder.build();
+
+            glGenFramebuffers(1, &gBuffer);
+            glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+
+            if (gPos.gBufferCode == SSAO_GBUFFER_POS)
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPos.getTextureRef(), 0);
+            if (gNor.gBufferCode == SSAO_GBUFFER_NOR)
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNor.getTextureRef(), 0);
+            if (gCol.gBufferCode == SSAO_GBUFFER_COL)
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gCol.getTextureRef(), 0);
+
+            GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+            glDrawBuffers(3, attachments);
+
+            // render buffer
+            glGenRenderbuffers(1, &renderDepth);
+            glBindRenderbuffer(GL_RENDERBUFFER, renderDepth);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WIDTH, HEIGHT);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderDepth);
+
+            // finally check if framebuffer is complete
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+                std::cout << "Framebuffer not complete!" << std::endl;
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+            //genSSAOFrameBuffer();
+
+            lights.clear();
+            for (GLint i = 0; i < MAX_LIGHT_CNT; ++i) {
+
+                float xPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 3.0);
+                float yPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 4.0);
+                float zPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 3.0);
+                // also calculate random color
+                float rColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.)
+                float gColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.)
+                float bColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.)
+
+                auto lightPos = glm::vec3(xPos, yPos, zPos);
+                lights.push_back(
+                    { lightPos,glm::vec3(rColor, gColor, bColor),-lightPos,false,false }
+                );
+            }
+        }
+        catch (std::runtime_error e)
+        {
+            std::cerr << e.what() << std::endl;
+        }
+
+        defRenderBufferGenerated = true;
+    }
+}
+
+void Application::deferredRenderPipeLine()
+{
+
+}
+
+// unused
 void Application::genSSAOFrameBuffer()
 {
     glGenFramebuffers(1, &ssaoFBO);
@@ -817,6 +841,9 @@ void Application::genSSAOFrameBuffer()
 
 void Application::imgui() {
     ImGui::Begin("Assignment 2 Demo");
+
+    ImGui::Separator();
+    ImGui::Checkbox("Switch to Deferred Rendering Pipeline", &ssaoEnabled);
 
     ImGui::Separator();
 

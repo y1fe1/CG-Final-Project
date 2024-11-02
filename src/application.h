@@ -90,8 +90,8 @@ private:
 
     Texture m_diffuseTex,m_specularTex;
 
-    bool ssaoEnabled = true;
-    bool defRenderBufferGenerated = true;
+    bool ssaoEnabled = false;
+    bool defRenderBufferGenerated = false;
     // SSAO Processing Shader
     Shader m_shaderGeometryPass;
     Shader m_shaderLightingPass;
@@ -104,6 +104,9 @@ private:
 
     GLuint renderDepth;
     
+    void genDeferredRenderBuffer(bool& defRenderBufferGenerated);
+    void deferredRenderPipeLine();
+
     // unused
     GLuint ssaoFBO = 0, ssaoBlurFBO = 0;
     ssaoBufferTex ssaoColorBuff, ssaoColorBlurBuff;
