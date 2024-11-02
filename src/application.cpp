@@ -5,7 +5,10 @@
 Application::Application()
     : m_window("Final Project", glm::ivec2(1024, 1024), OpenGLVersion::GL41)
     , texturePath("resources/texture/brickwall.jpg")
+    // , texturePath("resources/celestial_bodies/moon.jpg")
     , m_texture(RESOURCE_ROOT "resources/texture/checkerboard.png")
+    , m_texture_sun(RESOURCE_ROOT "resources/celestial_bodies/sun.jpg")
+    , m_texture_moon(RESOURCE_ROOT "resources/celestial_bodies/moon.jpg")
     , m_projectionMatrix(glm::perspective(glm::radians(80.0f), m_window.getAspectRatio(), 0.1f, 30.0f))
     , m_viewMatrix(glm::lookAt(glm::vec3(-1, 1, -1), glm::vec3(0), glm::vec3(0, 1, 0)))
     , m_modelMatrix(1.0f)
@@ -73,7 +76,7 @@ Application::Application()
             onKeyReleased(key, mods);
         });
 
-    m_window.registerMouseMoveCallback(std::bind(&Application::onMouseMove, this, std::placeholders::_1));
+    // m_window.registerMouseMoveCallback(std::bind(&Application::onMouseMove, this, std::placeholders::_1));
     m_window.registerMouseButtonCallback([this](int button, int action, int mods) {
         if (action == GLFW_PRESS)
             onMouseClicked(button, mods);
@@ -100,10 +103,17 @@ Application::Application()
             mesh.material.kdTexture = texPtr;
         }
     }
-
+    
     //m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/sphere.obj");
     m_meshes = GPUMesh::loadMeshGPU(cpuMeshes);  // load mesh from mesh list so we have more freedom on setting up each mesh
 
+    // Generate celestial bodies
+    std::vector<Mesh> bodies = generateCelestialBodies();
+    
+    for (Mesh& body : bodies) {
+        m_meshes.emplace_back(body);
+        // cpuMeshes.push_back(body);
+    }
 
     // ===  Create All Shader ===
     try {
@@ -165,6 +175,11 @@ Application::Application()
         postProcessShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/postProcess_vert.glsl");
         postProcessShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/postProcess_frag.glsl");
         m_postProcessShader = postProcessShader.build();
+
+        // ShaderBuilder celestialBodyShader;
+        // celestialBodyShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/celestial_body_vert.glsl");
+        // celestialBodyShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/celestial_body_frag.glsl");
+        // m_celestialBodyShader = celestialBodyShader.build();
 
         initPostProcess();
         applyNormalTexture();
@@ -254,16 +269,37 @@ void Application::update() {
         //const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
         const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(m_modelMatrix));
 
+        // if (showSolarSystem)
+        // {
+        //     glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), GL_FALSE);
+        //     glUniform1i(m_selShader->getUniformLocation("colorMap"), -1);
+        //     glUniform1i(m_selShader->getUniformLocation("useMaterial"), m_useMaterial);
+
+        //     drawSolarSystem();
+        // }
+        
+        // if (!showSolarSystem) {
         // Actualy Mesh Render Loop
         #pragma region Mesh render loop
-        for (GPUMesh& mesh : m_meshes) {
+        // for (GPUMesh& mesh : m_meshes) {
+        for (size_t i = 0; i < m_meshes.size(); ++i) {
+            // if (!showSolarSystem && i >= m_meshes.size() - 3)
+            // if (showSolarSystem && i == 0)
+            // {
+            //     // Hide the celestial bodies if showSolarSystem is false.
+            //     continue;
+            // }
+            // else if (!showSolarSystem && i >= 0) { continue; }
+
+            GPUMesh& mesh = m_meshes[i];
+
             //shadow maps generates the shadows
-        #pragma region shadow Map Genereates
-                    if (false)
-                    {
-                        mesh.drawShadowMap(m_shadowShader, lightMVP, m_shadowTex.getFramebuffer(), SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
-                    }
-        #pragma endregion
+            #pragma region shadow Map Genereates
+                if (false)
+                {
+                    mesh.drawShadowMap(m_shadowShader, lightMVP, m_shadowTex.getFramebuffer(), SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
+                }
+            #pragma endregion
 
             // set new Material every time it is updated
             GLuint newUBOMaterial;
@@ -293,6 +329,8 @@ void Application::update() {
             //glEnable(GL_BLEND); // Enable blending.
             //glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
+            //m_selShader = &m_debugShader;
+
             if (multiLightShadingEnabled) {
                 m_selShader = usePbrShading ? &m_pbrShader : &m_multiLightShader;
             }
@@ -300,7 +338,6 @@ void Application::update() {
                 m_selShader = &m_defaultShader;
             }
 
-            //m_selShader = &m_debugShader;
             m_selShader->bind();
 
             // Set up matrices and view position
@@ -312,7 +349,13 @@ void Application::update() {
 
             // Texture and material settings
             bool hasTexCoords = mesh.hasTextureCoords();
-            m_texture.bind(hasTexCoords ? GL_TEXTURE0 : 0);
+            if (i == 0) {
+                m_texture.bind(hasTexCoords ? GL_TEXTURE0 : 0);
+            } else if (i == 1) {
+                m_texture_sun.bind(hasTexCoords ? GL_TEXTURE0 : 0);
+            } else if (i == 2) {
+                m_texture_moon.bind(hasTexCoords ? GL_TEXTURE0 : 0);
+            }
 
             // PBR Material Texture
             auto bindSlot = GL_TEXTURE10;
@@ -330,8 +373,8 @@ void Application::update() {
             m_selShader->bindUniformBlock("shadowSetting", 2, shadowSettingUbo);
 
             glBindVertexArray(mesh.getVao());
-                m_shadowTex.bind(GL_TEXTURE1);
-                glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
+            m_shadowTex.bind(GL_TEXTURE1);
+            glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
             glBindVertexArray(0);
 
             //// Restore default depth test settings and disable blending.
@@ -392,9 +435,7 @@ void Application::update() {
                 genUboBufferObj(*selectedLight, lightUBO); // Pass single Light
                 mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
             }
-
-            renderMiniMap();
-           	
+            
             int lightsCnt = static_cast<int>(lights.size());
             glBindVertexArray(mesh.getVao());
             m_lightShader.bind();
@@ -420,7 +461,8 @@ void Application::update() {
 
             mesh.drawBasic(m_lightShader);
         }
-#pragma endregion
+        #pragma endregion
+        // }
 
         // Render Enviroment Mapping at the end
         if (envMapEnabled) {
@@ -456,6 +498,8 @@ void Application::update() {
 
             glDepthFunc(GL_LESS);
         }
+
+        renderMiniMap();
 							
         if (usePostProcess) {
             // 绑定默认帧缓冲对象，将结果绘制到屏幕
@@ -760,6 +804,10 @@ void Application::imgui() {
     ImGui::Checkbox("Normal Mapping Enabled", &useNormalMapping);
 
     ImGui::Separator();
+    ImGui::Text("Miscellaneous");
+    ImGui::Checkbox("Show Solar System", &showSolarSystem);
+
+    ImGui::Separator();
     ImGui::Text("Lights");
     ImGui::Checkbox("MultiLightShading", &multiLightShadingEnabled);
     itemStrings.clear();
@@ -837,7 +885,8 @@ void Application::renderMiniMap() {
     // 使用小地图的视图矩阵和投影矩阵渲染场景
     m_selShader->bind();
     const glm::mat4 mvpMatrix = minimap.projectionMatrix() * minimap.viewMatrix() * m_modelMatrix;
-    glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+    // glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+    glUniformMatrix4fv(m_selShader->getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
 
     // 渲染小地图内容
     for (GPUMesh& mesh : m_meshes) {
@@ -1041,4 +1090,104 @@ void Application::renderFullScreenQuad() {
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
+}
+
+
+// Hierarchical transformation of a simplified solar system
+void Application::updateBodyPosition(glm::mat4& originMatrix, float radius, glm::mat4& bodyMatrix, float speed)
+{
+    float angle = speed * frame;
+    glm::vec3 translation = glm::vec3(
+        radius * cos(angle),
+        radius * sin(angle),
+        0.0f
+    );
+
+    glm::mat4 newMatrix = glm::mat4(1.0f);
+    newMatrix = translate(newMatrix, translation);
+
+    bodyMatrix = originMatrix * newMatrix;
+}
+
+std::vector<Mesh> Application::generateCelestialBodies()
+{
+    // Mesh sun    = generateSphereMesh(SUN_RADIUS, 20, 20);
+    Mesh earth  = generateSphereMesh(EARTH_RADIUS, 20, 20);
+    Mesh moon   = generateSphereMesh(MOON_RADIUS, 500, 500);
+
+    std::vector<Mesh> bodies{ earth, moon };
+
+    // std::string path = "resources/celestial_bodies/moon.jpg";
+    std::string path = std::string(RESOURCE_ROOT) + "resources/celestial_bodies/moon.jpg";
+    if (std::filesystem::exists(path))
+    {
+        std::shared_ptr texPtr = std::make_shared<Image>(path);
+        
+        for (Mesh& mesh : bodies)
+        {
+            mesh.material.kdTexture = texPtr;
+        }
+    }
+
+    return bodies;
+}
+
+Mesh Application::generateSphereMesh(float radius, int rings, int sectors)
+{
+    std::vector<Vertex> vertices;
+    std::vector<glm::uvec3> triangles;
+
+    for (int r = 0; r <= rings; ++r) {
+        float ring2D = ((float) r) / rings;
+        float theta = ring2D * M_PI; // latitude
+        float sinTheta = sin(theta);
+        float cosTheta = cos(theta);
+
+        for (int s = 0; s <= sectors; ++s) {
+            float sector2D = ((float) s) / sectors;
+            float phi = sector2D * 2 * M_PI; // longitude
+            float sinPhi = sin(phi);
+            float cosPhi = cos(phi);
+
+            // Position of the vertex
+            float x = cosPhi * sinTheta;
+            float y = cosTheta;
+            float z = sinPhi * sinTheta;
+
+            // Create the vertex
+            Vertex vertex;
+            vertex.position = glm::vec3(x * radius, y * radius, z * radius);
+            vertex.normal   = glm::normalize(vertex.position);
+            vertex.texCoord = glm::vec2(sector2D, ring2D);
+
+            vertices.push_back(vertex);
+        }
+    }
+
+    // Generate indices for the triangles
+    for (int r = 0; r < rings; ++r) {
+        for (int s = 0; s < sectors; ++s) {
+            unsigned int first = (r * (sectors + 1)) + s; // Current vertex
+            unsigned int second = first + sectors + 1; // Next vertex in the next ring
+
+            // Create two triangles for each sector
+            triangles.push_back(glm::uvec3(first, second, first + 1));
+            // <-- CHANGE? v
+            triangles.push_back(glm::uvec3(first, second + 1, first + 1));
+        }
+    }
+
+    std::shared_ptr meshptr = std::make_shared<Mesh>();
+    meshptr->vertices = vertices;
+    meshptr->triangles = triangles;
+    
+    std::shared_ptr mat = std::make_shared<Material>();
+    meshptr->material = *mat;
+
+    return *meshptr;
+}
+
+void Application::updateFrameNumber()
+{
+    frame = (frame + 1) % 360;
 }

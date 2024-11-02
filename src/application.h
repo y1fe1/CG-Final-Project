@@ -37,6 +37,8 @@ private:
     Shader m_pointShader;
     Shader m_postProcessShader;
 
+    // Shader m_celestialBodyShader;
+
     // Definition for SkyBox 
     bool envMapEnabled = false;
 
@@ -85,7 +87,10 @@ private:
 
     // Definition for model Obejcts includeing texture and Material
     std::vector<GPUMesh> m_meshes;
+    std::vector<GPUMesh> m_meshes_celestial;
     Texture m_texture;
+    Texture m_texture_sun;
+    Texture m_texture_moon;
 
     char file_path_buffer[256];
     std::string texturePath;
@@ -149,6 +154,25 @@ private:
     GLuint depthbufferPostProcess;
     const int WINDOW_WIDTH = 1920;
     const int WINDOW_HEIGHT = 1080;
+
+    //Hierarchical transformation
+    bool showSolarSystem = false;
+    int frame = 0;
+    void updateFrameNumber();
+    glm::mat4 sunMatrix = glm::mat4(1.0f);
+    glm::mat4 earthMatrix = glm::mat4(1.0f);
+    glm::mat4 moonMatrix = glm::mat4(1.0f);
+    float sunOrbitRadius = 2.0f;
+    float earthOrbitRadius = 0.8f;
+    float earthSpeed = 0.05f;
+    float moonSpeed = 0.03f;
+    const float SUN_RADIUS = 10.0f;
+    const float EARTH_RADIUS = 2.5f;
+    const float MOON_RADIUS = 0.15f;
+    Mesh generateSphereMesh(float radius, int rings, int sectors);
+    std::vector<Mesh> generateCelestialBodies();
+    void updateBodyPosition(glm::mat4& originMatrix, float radius, glm::mat4& bodyMatrix, float speed);
+    void drawSolarSystem();
 
 public:
     Application();
