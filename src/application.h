@@ -22,7 +22,7 @@ private:
     Window m_window;
     Trackball trackball;
 
-    GLuint lightUBO;
+    GLuint lightUBO = 0;
 
     Shader m_debugShader;
     Shader m_defaultShader;
@@ -88,26 +88,29 @@ private:
 
     /// SSAO Defintions ///
 
-    bool ssaoEnabled = false;
+    Texture m_diffuseTex,m_specularTex;
 
+    bool ssaoEnabled = true;
+    bool defRenderBufferGenerated = true;
     // SSAO Processing Shader
     Shader m_shaderGeometryPass;
     Shader m_shaderLightingPass;
 
     Shader m_deferredLightShader;
+    Shader m_deferredDebugShader;
 
-    Shader m_shaderSSAO;
-    Shader m_shaderSSAOBlur;
-
-    GLuint gBuffer;
+    GLuint gBuffer = 0;
     ssaoBufferTex gPos, gNor, gCol;
 
     GLuint renderDepth;
     
     // unused
-    GLuint ssaoFBO, ssaoBlurFBO;
+    GLuint ssaoFBO = 0, ssaoBlurFBO = 0;
     ssaoBufferTex ssaoColorBuff, ssaoColorBlurBuff;
     ssaoBufferTex ssaoNoiseTex;
+
+    Shader m_shaderSSAO;
+    Shader m_shaderSSAOBlur;
 
     void genSSAOFrameBuffer();
 

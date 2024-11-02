@@ -181,14 +181,14 @@ void main()
             //basic phong model
             if(lambert >= 0.0f) {
                 Specular = ks * pow(max(dot(halfDir, normal), 0.0f), shininess);
-                Specular = (hasTexCoords)? texColor.rgb * Specular : Specular;
+                Specular = (hasTexCoords)? texColor.rgb * Specular : Specular * LightList[idx].color;
             }
         
             // Calculate the light attenuation factor based on distance
             float lightAttenuationFactor = getLightAttenuationFactor(LightList[idx],lightDir);
 
             //vec3 finalColor = (ambient + diffuse + Specular);
-            finalColor = (diffuse + Specular) * LightList[idx].color * (1-shadowFactor) * lightAttenuationFactor;
+            finalColor = (diffuse + Specular) * (1-shadowFactor) * lightAttenuationFactor;
             //vec3 finalColor = diffuse;
             fragColor += vec4(finalColor, 1.0);
         }
