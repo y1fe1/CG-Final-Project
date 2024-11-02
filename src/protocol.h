@@ -60,6 +60,8 @@ inline std::array<const char*, 2> materialModelNames{ "normal","PBR Material" };
 
 
     #pragma region LightRelated
+
+// point light
 struct Light {
     glm::vec3 position;
     float _UNUSE_PADDING0;
@@ -74,6 +76,12 @@ struct Light {
     bool has_texture;
     uint8_t _UNUSE_PADDING3[2];
 
+    //light attenuation factor
+    float linear = 0.7f;
+    float _UNUSE_PADDING4;  
+    float quadratic = 1.8f;
+    float radius = 0.0f;  // only be enabled if this is a cube light
+
     Light(): 
         position(glm::vec3(0.0f)), _UNUSE_PADDING0(0.0f),
 
@@ -81,20 +89,31 @@ struct Light {
 
         direction(-glm::vec3(0.0f, 0.0f, 1.0f)), _UNUSE_PADDING2(0.0f),
 
-        is_spotlight(false), has_texture(false),_UNUSE_PADDING3{ 0, 0 } 
+        is_spotlight(false), has_texture(false),_UNUSE_PADDING3{ 0, 0 },
+
+        linear(0.7f), _UNUSE_PADDING4(0.0f), quadratic(1.8f), radius(0.0f)
     {}
 
-    Light(glm::vec3 pos, glm::vec3 col, glm::vec3 dir, bool spotlight, bool texture):
+    Light(glm::vec3 pos, glm::vec3 col, glm::vec3 dir, bool spotlight, bool texture,
+        float lin = 0.7f, float quad = 1.8f):
         position(pos), _UNUSE_PADDING0(0.0f),
 
         color(col), _UNUSE_PADDING1(0.0f),
 
         direction(dir), _UNUSE_PADDING2(0.0f),
 
-        is_spotlight(spotlight), has_texture(texture),_UNUSE_PADDING3{ 0, 0 } 
+        is_spotlight(spotlight), has_texture(texture),_UNUSE_PADDING3{ 0, 0 },
+        linear(lin), _UNUSE_PADDING4(0.0f), quadratic(quad), radius(0.0f)
     {}
     //std::shared_ptr<Texture> texture; light Texture not used yet
 };
+
+inline float calculateLightRadius(const Light& light) {
+    float maxBrightness = std::fmaxf(std::fmaxf(light.color.r, light.color.g), light.color.b);
+    return (-light.linear + std::sqrt(light.linear * light.linear - 4.0f * light.quadratic *
+        (1.0f - (256.0f / 5.0f) * maxBrightness))) / (2.0f * light.quadratic);
+}
+
 
 inline const int MAXLIGHT = 10;
 inline size_t curLightIndex = 0;
@@ -111,10 +130,11 @@ struct shadowLoadingException : public std::runtime_error {
 struct shadowSetting {
     alignas(4) bool shadowEnabled = 0;  // 4 bytes
     alignas(4) bool pcfEnabled = 0;     // 4 bytes
-    alignas(4) bool _UNUSE_PADDING0 = 0; // Additional 8 bytes for 16-byte alignment
-    alignas(4) bool _UNUSE_PADDING1 = 0;
+    alignas(4) bool _UNUSE_PADDING6 = 0; // Additional 8 bytes for 16-byte alignment
+    alignas(4) bool _UNUSE_PADDING7 = 0;
 };
 
+// this should be moved and defiend as a child class of abstract texture
 struct ShadowTexture {
 public:
     ShadowTexture() {
@@ -182,6 +202,9 @@ void resetObjList(std::vector<T>& objects, T& defaultObject) {
 
 template <typename T> 
 void genUboBufferObj(std::vector<T>& objLists, GLuint& selUboBuffer, int maxObjListCnt) {
+
+    selUboBuffer = 0; // reset 
+
     glGenBuffers(1, &selUboBuffer);
     if (selUboBuffer == 0) {
         // Handle error if buffer generation failed
@@ -289,3 +312,62 @@ inline const float quadVertices[] = {
      1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
      1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
 };
+
+inline const std::vector<glm::vec3> objectPositions = {
+    { -3.0f, -0.5f, -3.0f },
+    {  0.0f, -0.5f, -3.0f },
+    {  3.0f, -0.5f, -3.0f },
+    { -3.0f, -0.5f,  0.0f },
+    {  0.0f, -0.5f,  0.0f },
+    {  3.0f, -0.5f,  0.0f },
+    { -3.0f, -0.5f,  3.0f },
+    {  0.0f, -0.5f,  3.0f },
+    {  3.0f, -0.5f,  3.0f }
+};
+
+inline std::vector<glm::vec3> generateSSAOKernel(GLuint kernelSize = 64)
+{
+    std::vector<glm::vec3> ssaoKernel;
+    std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
+    std::default_random_engine generator;
+
+    for (unsigned int i = 0; i < kernelSize; ++i)
+    {
+        glm::vec3 sample(
+            randomFloats(generator) * 2.0f - 1.0f,
+            randomFloats(generator) * 2.0f - 1.0f,
+            randomFloats(generator)
+        );
+
+        sample = glm::normalize(sample);
+        sample *= randomFloats(generator);
+
+        float scale = float(i) / float(kernelSize);
+        scale = std::lerp(0.1f, 1.0f, scale * scale); // Scale to concentrate points closer to origin
+        sample *= scale;
+
+        ssaoKernel.push_back(sample);
+    }
+
+    return ssaoKernel;
+}
+
+inline std::vector<glm::vec3> generateSSAONoise(GLuint noiseSize = 16)
+{
+    std::vector<glm::vec3> ssaoNoise;
+    std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
+    std::default_random_engine generator;
+
+    for (unsigned int i = 0; i < noiseSize; i++)
+    {
+        // Generate random noise in the range [-1, 1] for x and y
+        glm::vec3 noise(
+            randomFloats(generator) * 2.0f - 1.0f,
+            randomFloats(generator) * 2.0f - 1.0f,
+            0.0f // Fixed z component
+        );
+        ssaoNoise.push_back(noise);
+    }
+
+    return ssaoNoise;
+}

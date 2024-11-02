@@ -23,7 +23,7 @@ private:
     Window m_window;
     Trackball trackball;
 
-    GLuint lightUBO;
+    GLuint lightUBO = 0;
 
     Shader m_debugShader;
     Shader m_defaultShader;
@@ -81,7 +81,36 @@ private:
     Shader m_brdfShader;
     GLuint quadVAO = 0, quadVBO = 0;
 
-    void generateHdrMap();
+    /// SSAO Defintions ///
+
+    Texture m_diffuseTex,m_specularTex;
+
+    bool ssaoEnabled = false;
+    bool defRenderBufferGenerated = false;
+    // SSAO Processing Shader
+    Shader m_shaderGeometryPass;
+    Shader m_shaderLightingPass;
+
+    Shader m_deferredLightShader;
+    Shader m_deferredDebugShader;
+
+    GLuint gBuffer = 0;
+    ssaoBufferTex gPos, gNor, gCol;
+
+    GLuint renderDepth;
+    
+    void genDeferredRenderBuffer(bool& defRenderBufferGenerated);
+    void deferredRenderPipeLine();
+
+    // unused
+    GLuint ssaoFBO = 0, ssaoBlurFBO = 0;
+    ssaoBufferTex ssaoColorBuff, ssaoColorBlurBuff;
+    ssaoBufferTex ssaoNoiseTex;
+
+    Shader m_shaderSSAO;
+    Shader m_shaderSSAOBlur;
+
+    void genSSAOFrameBuffer();
 
     // Definition for model Obejcts includeing texture and Material
     std::vector<GPUMesh> m_meshes;

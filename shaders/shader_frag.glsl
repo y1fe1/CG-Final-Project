@@ -15,8 +15,8 @@ layout(std140) uniform Material // Must match the GPUMaterial defined in src/mes
 layout(std140) uniform shadowSetting{
     bool shadowEnabled;
     bool pcfEnabled;
-    bool _UNUSE_PADDING4;
-    bool _UNUSE_PADDING;
+    bool _UNUSE_PADDING6;
+    bool _UNUSE_PADDING7;
 };
 uniform sampler2D texShadow;
 
@@ -34,6 +34,11 @@ layout(std140) uniform Light {
     bool is_spotlight;
     bool has_texture;
     vec2 _UNUSE_PADDING3;
+
+    float linear;
+    float _UNUSE_PADDING4;  
+    float quadratic;
+    float radius;
 };
 
 uniform mat4 lightMVP;
@@ -102,7 +107,7 @@ float shadowFactorCal(vec2 shadowMapCoord, float fragLightDepth){
 
 float getLightAttenuationFactor(vec3 lightDir) {
     float dist = length(lightDir);
-    float attenuation = 1.0 / (dist * dist); // Simple quadratic falloff
+    float attenuation = 1.0 / (1.0 +  linear * dist + quadratic*dist * dist); // Simple quadratic falloff
 
     // Clamp the attenuation to avoid excessively bright values at close distances
     return clamp(attenuation, 0.0, 1.0);

@@ -26,6 +26,15 @@ Application::Application()
     , hdrPrefilteredMap(RENDER_PRE_FILTER_HDR_MAP)
     , BRDFTexture(BRDF_2D_TEXTURE)
 
+    // SSAO Buffer Generation
+    , m_diffuseTex(RESOURCE_ROOT "resources/texture/2k_earth_map_diffuse.jpg")
+    , m_specularTex(RESOURCE_ROOT "resources/texture/2k_earth_map_specular.png")
+    , gPos(SSAO_GBUFFER_POS)
+    , gNor(SSAO_GBUFFER_NOR)
+    , gCol(SSAO_GBUFFER_COL)
+    , ssaoColorBuff(SSAO_COLOR_BUFF)
+    , ssaoColorBlurBuff(SSAO_COLOR_BLUR)
+    , ssaoNoiseTex()
     , trackball{ &m_window, glm::radians(50.0f) }
 {
     //Camera defaultCamera = Camera(&m_window);
@@ -39,11 +48,11 @@ Application::Application()
         { glm::vec3(-1, 3, 2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
     );
 
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/normal.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/albedo.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/metallic.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/roughness.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/ao.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/normal.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/albedo.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/metallic.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/roughness.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/ao.png")));
 
     //lights.push_back(
     //    { glm::vec3(2, 1, 2), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
@@ -135,8 +144,8 @@ Application::Application()
         // set up light Shader
         ShaderBuilder lightShaderBuilder;
         lightShaderBuilder
-            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/light_vert.glsl")
-            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/light_frag.glsl");
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/lights/light_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/lights/light_frag.glsl");
         m_lightShader = lightShaderBuilder.build();
 
         ShaderBuilder skyBoxBuilder;
@@ -150,21 +159,20 @@ Application::Application()
             .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/skybox_vert.glsl")
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_skybox_frag.glsl");
         m_hdrSkyBoxShader = hdrSkyBoxBuilder.build();
-			
-        ShaderBuilder borderShader;
-        borderShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/border_vert.glsl");
-        borderShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/border_frag.glsl");
-        m_borderShader = borderShader.build();
 
-        ShaderBuilder pointShader;
-        pointShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/border_vert.glsl");
-        pointShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/border_frag.glsl");
-        m_pointShader = pointShader.build();
-        
-        ShaderBuilder postProcessShader;
-        postProcessShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/postProcess_vert.glsl");
-        postProcessShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/postProcess_frag.glsl");
-        m_postProcessShader = postProcessShader.build();
+        /*
+        ShaderBuilder ssaoBuilder;
+        ssaoBuilder
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/lights/light_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/lights/light_frag.glsl");
+        m_shaderSSAO = ssaoBuilder.build();
+
+        ShaderBuilder ssaoBlurBuilder;
+        ssaoBlurBuilder
+            .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/lights/light_vert.glsl")
+            .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/lights/light_frag.glsl");
+        m_shaderSSAOBlur = ssaoBuilder.build();
+        */
 
         initPostProcess();
         applyNormalTexture();
@@ -230,11 +238,11 @@ void Application::update() {
 
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 
-        //glClearDepth(1.0);
+        glClearDepth(1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         //glDisable(GL_CULL_FACE);
-        glEnable(GL_DEPTH_TEST);
+        //glEnable(GL_DEPTH_TEST);
  
         const glm::vec3 cameraPos = trackball.position();
         //const glm::vec3 cameraPos = selectedCamera->cameraPos();
@@ -293,59 +301,171 @@ void Application::update() {
             //glEnable(GL_BLEND); // Enable blending.
             //glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
-            if (multiLightShadingEnabled) {
-                m_selShader = usePbrShading ? &m_pbrShader : &m_multiLightShader;
+            // ssao will set a completely different render pipeline
+            if (ssaoEnabled) 
+            {
+                genDeferredRenderBuffer(defRenderBufferGenerated);
+
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+                m_selShader = &m_shaderGeometryPass;
+
+                // GeoMetryPass
+                glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+                //glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                glDisable(GL_BLEND);
+
+                m_selShader->bind();
+
+                glUniformMatrix4fv(m_selShader->getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(view));
+                glUniformMatrix4fv(m_selShader->getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+                for (GLuint i = 0; i < objectPositions.size(); ++i) {
+
+                    auto modelMatrix = glm::translate(model, objectPositions[i]);
+                    modelMatrix = glm::scale(modelMatrix, glm::vec3(0.5f));
+                    glUniformMatrix4fv(m_selShader->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
+
+                    auto normalMatrix = glm::inverseTranspose(glm::mat3(modelMatrix));
+                    glUniformMatrix3fv(m_selShader->getUniformLocation("normalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrix));
+
+                    m_diffuseTex.bind(GL_TEXTURE10);
+                    glUniform1i(m_selShader->getUniformLocation("texture_diffuse"), 10);
+
+                    m_specularTex.bind(GL_TEXTURE11);
+                    glUniform1i(m_selShader->getUniformLocation("texture_specular"), 11);
+
+                    mesh.drawBasic(*m_selShader);
+                }
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+                
+                // Lighting Pass
+                m_selShader = &m_shaderLightingPass;
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                m_selShader->bind();
+
+                gPos.bind(GL_TEXTURE0);
+                gNor.bind(GL_TEXTURE1);
+                gCol.bind(GL_TEXTURE2);
+
+                glUniform1i(m_selShader->getUniformLocation("gPosition"), true ? 0 : -1);
+                glUniform1i(m_selShader->getUniformLocation("gNormal"), true ? 1 : -1);
+                glUniform1i(m_selShader->getUniformLocation("gAlbedoSpec"), true ? 2 : -1);
+
+                for (auto& light : lights) {
+                    light.radius = calculateLightRadius(light);
+                }
+
+                genUboBufferObj(lights, lightUBO, MAX_LIGHT_CNT);  // pass the light into the buffer
+
+                m_selShader->bindUniformBlock("lights", 3, lightUBO);
+
+                glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+
+                renderQuad(quadVAO, quadVBO, quadVertices, 20);
+
+                // copy depth buffer to default framebuffer's depth buffer
+                glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer);
+                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); 
+
+                glBlitFramebuffer(0, 0, WIDTH, HEIGHT, 0, 0, WIDTH, HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                
+                // render Light at the end 
+                m_selShader = &m_deferredLightShader;
+                m_selShader->bind();
+
+
+                for (const Light& light : lights) {
+
+                    auto modelMatrix = glm::translate(model, light.position);
+                    modelMatrix = glm::scale(modelMatrix, glm::vec3(0.125f));
+                    glUniformMatrix4fv(m_selShader->getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(projection * view * modelMatrix));
+                    glUniform3fv(m_lightShader.getUniformLocation("color"), 1, glm::value_ptr(light.color));
+                    glUniform4fv(m_lightShader.getUniformLocation("pos"), 1, glm::value_ptr(light.position));
+
+                    renderHDRCubeMap(cubeVAO, cubeVBO, hdrMapVertices, 288);
+                }
+
+                /*
+                m_deferredDebugShader.bind();
+                gNor.bind(GL_TEXTURE0);
+                glUniform1i(m_deferredDebugShader.getUniformLocation("fboDebug"), true ? 0 : -1);
+
+                renderQuad(quadVAO, quadVBO, quadVertices, 20);
+                */
             }
-            else {
-                m_selShader = &m_defaultShader;
-            }
 
-            //m_selShader = &m_debugShader;
-            m_selShader->bind();
+            else 
+            {
+                lights.clear();
 
-            // Set up matrices and view position
-            glUniformMatrix4fv(m_selShader->getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
-            glUniformMatrix3fv(m_selShader->getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
-            glUniformMatrix4fv(m_selShader->getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
-            glUniformMatrix4fv(m_selShader->getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
-            glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+                // lights must be initialized here since light is still struct not class
+                lights.push_back(
+                    { glm::vec3(1, 3, -2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
+                );
 
-            // Texture and material settings
-            bool hasTexCoords = mesh.hasTextureCoords();
-            m_texture.bind(hasTexCoords ? GL_TEXTURE0 : 0);
+                lights.push_back(
+                    { glm::vec3(-1, 3, 2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
+                );
 
-            // PBR Material Texture
-            auto bindSlot = GL_TEXTURE10;
-            for (auto& pbrTexture : m_pbrTextures) {
-                pbrTexture.bind(bindSlot);
-                bindSlot++;
-            }
+                GLuint PbrUBO;
 
-            hasTexCoords = hasTexCoords && textureEnabled;
-            glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), hasTexCoords);
-            glUniform1i(m_selShader->getUniformLocation("colorMap"), hasTexCoords ? 0 : -1);
-            glUniform1i(m_selShader->getUniformLocation("useMaterial"),m_useMaterial);
+                if (multiLightShadingEnabled) {
+                    m_selShader = usePbrShading ? &m_pbrShader : &m_multiLightShader;
+                }
+                else {
+                    m_selShader = &m_defaultShader;
+                }
 
-            // Pass in shadow settings as UBO
-            m_selShader->bindUniformBlock("shadowSetting", 2, shadowSettingUbo);
+                //m_selShader = &m_debugShader;
+                m_selShader->bind();
 
-            glBindVertexArray(mesh.getVao());
+                // Set up matrices and view position
+                glUniformMatrix4fv(m_selShader->getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+                glUniformMatrix3fv(m_selShader->getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
+                glUniformMatrix4fv(m_selShader->getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
+                glUniformMatrix4fv(m_selShader->getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
+                glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+
+                // Texture and material settings
+                bool hasTexCoords = mesh.hasTextureCoords();
+                m_texture.bind(hasTexCoords ? GL_TEXTURE0 : 0);
+
+                // PBR Material Texture
+                auto bindSlot = GL_TEXTURE10;
+                for (auto& pbrTexture : m_pbrTextures) {
+                    pbrTexture.bind(bindSlot);
+                    bindSlot++;
+                }
+
+                hasTexCoords = hasTexCoords && textureEnabled;
+                glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), hasTexCoords);
+                glUniform1i(m_selShader->getUniformLocation("colorMap"), hasTexCoords ? 0 : -1);
+                glUniform1i(m_selShader->getUniformLocation("useMaterial"), m_useMaterial);
+
+                // Pass in shadow settings as UBO
+                m_selShader->bindUniformBlock("shadowSetting", 2, shadowSettingUbo);
+
+                glBindVertexArray(mesh.getVao());
                 m_shadowTex.bind(GL_TEXTURE1);
                 glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
-            glBindVertexArray(0);
+                glBindVertexArray(0);
 
-            //// Restore default depth test settings and disable blending.
-            //glDepthFunc(GL_LEQUAL);
-            //glDepthMask(GL_TRUE);
-            //glDisable(GL_BLEND);
+                //// Restore default depth test settings and disable blending.
+                //glDepthFunc(GL_LEQUAL);
+                //glDepthMask(GL_TRUE);
+                //glDisable(GL_BLEND);
 
-            // pass in env map
-            glBindVertexArray(mesh.getVao());
-            skyboxTexture.bind(GL_TEXTURE20);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-            glUniform1i(m_selShader->getUniformLocation("SkyBox"), 20);
-            glUniform1i(m_selShader->getUniformLocation("useEnvMap"), envMapEnabled);
-            glBindVertexArray(0);
+                // pass in env map
+                glBindVertexArray(mesh.getVao());
+                skyboxTexture.bind(GL_TEXTURE20);
+                glDrawArrays(GL_TRIANGLES, 0, 36);
+                glUniform1i(m_selShader->getUniformLocation("SkyBox"), 20);
+                glUniform1i(m_selShader->getUniformLocation("useEnvMap"), envMapEnabled);
+                glBindVertexArray(0);
 
             if (useNormalMapping) {
                 glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_TRUE);
@@ -356,69 +476,70 @@ void Application::update() {
                 glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_FALSE);
             }
 
-            // Generate UBOs and draw
-            if (multiLightShadingEnabled) {
-                genUboBufferObj(lights, lightUBO, MAX_LIGHT_CNT);
-                glUniform1i(m_selShader->getUniformLocation("LightCount"), static_cast<GLint>(lights.size()));
+                // Generate UBOs and draw
+                if (multiLightShadingEnabled) {
+                    genUboBufferObj(lights, lightUBO, MAX_LIGHT_CNT);
+                    glUniform1i(m_selShader->getUniformLocation("LightCount"), static_cast<GLint>(lights.size()));
 
-                if (usePbrShading) {
+                    if (usePbrShading) {
 
-                    genUboBufferObj(m_PbrMaterial, PbrUBO);
+                        genUboBufferObj(m_PbrMaterial, PbrUBO);
 
-                    glUniform1i(m_selShader->getUniformLocation("normalMap"), true ? 10 : -1);
-                    glUniform1i(m_selShader->getUniformLocation("albedoMap"), true ? 11 : -1);
-                    glUniform1i(m_selShader->getUniformLocation("metallicMap"), true ? 12 : -1);
-                    glUniform1i(m_selShader->getUniformLocation("roughnessMap"), true ? 13 : -1);
-                    glUniform1i(m_selShader->getUniformLocation("aoMap"), true ? 14 : -1);
+                        glUniform1i(m_selShader->getUniformLocation("normalMap"), true ? 10 : -1);
+                        glUniform1i(m_selShader->getUniformLocation("albedoMap"), true ? 11 : -1);
+                        glUniform1i(m_selShader->getUniformLocation("metallicMap"), true ? 12 : -1);
+                        glUniform1i(m_selShader->getUniformLocation("roughnessMap"), true ? 13 : -1);
+                        glUniform1i(m_selShader->getUniformLocation("aoMap"), true ? 14 : -1);
 
-                    hdrIrradianceMap.bind(GL_TEXTURE15);
-                    glUniform1i(m_selShader->getUniformLocation("irradianceMap"), true ? 15 : -1);
+                        hdrIrradianceMap.bind(GL_TEXTURE15);
+                        glUniform1i(m_selShader->getUniformLocation("irradianceMap"), true ? 15 : -1);
 
-                    hdrPrefilteredMap.bind(GL_TEXTURE16);
-                    glUniform1i(m_selShader->getUniformLocation("prefilteredMap"), true ? 16 : -1);
+                        hdrPrefilteredMap.bind(GL_TEXTURE16);
+                        glUniform1i(m_selShader->getUniformLocation("prefilteredMap"), true ? 16 : -1);
 
-                    BRDFTexture.bind(GL_TEXTURE17);
-                    glUniform1i(m_selShader->getUniformLocation("brdfLUT"), true ? 17 : -1);
+                        BRDFTexture.bind(GL_TEXTURE17);
+                        glUniform1i(m_selShader->getUniformLocation("brdfLUT"), true ? 17 : -1);
 
-                    glUniform1i(m_selShader->getUniformLocation("hdrEnvMapEnabled"), hdrMapEnabled);
+                        glUniform1i(m_selShader->getUniformLocation("hdrEnvMapEnabled"), hdrMapEnabled);
 
-                    mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
+                        mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
+                    }
+                    else {
+                        mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
+                    }
                 }
                 else {
+                    genUboBufferObj(*selectedLight, lightUBO); // Pass single Light
                     mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
                 }
-            }
-            else {
-                genUboBufferObj(*selectedLight, lightUBO); // Pass single Light
-                mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
-            }
 
             renderMiniMap();
            	
-            int lightsCnt = static_cast<int>(lights.size());
-            glBindVertexArray(mesh.getVao());
-            m_lightShader.bind();
-            {
-                const glm::vec4 screenPos = mvpMatrix * glm::vec4(selectedLight->position, 1.0f);
-                const glm::vec3 color = selectedLight->color;
+                int lightsCnt = static_cast<int>(lights.size());
+                glBindVertexArray(mesh.getVao());
+                m_lightShader.bind();
+                {
+                    const glm::vec4 screenPos = mvpMatrix * glm::vec4(selectedLight->position, 1.0f);
+                    const glm::vec3 color = selectedLight->color;
 
-                glPointSize(40.0f);
-                glUniform4fv(m_lightShader.getUniformLocation("pos"), 1, glm::value_ptr(screenPos));
-                glUniform3fv(m_lightShader.getUniformLocation("color"), 1, glm::value_ptr(color));
-                glDrawArrays(GL_POINTS, 0, 1);
+                    glPointSize(40.0f);
+                    glUniform4fv(m_lightShader.getUniformLocation("pos"), 1, glm::value_ptr(screenPos));
+                    glUniform3fv(m_lightShader.getUniformLocation("color"), 1, glm::value_ptr(color));
+                    glDrawArrays(GL_POINTS, 0, 1);
+                }
+
+                for (const Light& light : lights) {
+                    const glm::vec4 screenPos = mvpMatrix * glm::vec4(light.position, 1.0f);
+
+                    glPointSize(10.0f);
+                    glUniform4fv(m_lightShader.getUniformLocation("pos"), 1, glm::value_ptr(screenPos));
+                    glUniform3fv(m_lightShader.getUniformLocation("color"), 1, glm::value_ptr(light.color));
+                    glDrawArrays(GL_POINTS, 0, 1);
+                }
+                glBindVertexArray(0);
+
+                mesh.drawBasic(m_lightShader);
             }
-
-            for (const Light& light : lights) {
-                const glm::vec4 screenPos = mvpMatrix * glm::vec4(light.position, 1.0f);
-
-                glPointSize(10.0f);
-                glUniform4fv(m_lightShader.getUniformLocation("pos"), 1, glm::value_ptr(screenPos));
-                glUniform3fv(m_lightShader.getUniformLocation("color"), 1, glm::value_ptr(light.color));
-                glDrawArrays(GL_POINTS, 0, 1);
-            }
-            glBindVertexArray(0);
-
-            mesh.drawBasic(m_lightShader);
         }
 #pragma endregion
 
@@ -657,8 +778,133 @@ void Application::generateHdrMap()
     }
 }
 
+// generate deferred rendering buffer before the pipeline begin, this should be only excuted once
+void Application::genDeferredRenderBuffer(bool& defRenderBufferGenerated)
+{
+    // deferred rendering pipeline generation
+    if (!defRenderBufferGenerated) {
+        try
+        {
+            ShaderBuilder shaderGeometryPassBuilder;
+            shaderGeometryPassBuilder
+                .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/deferred_render/gGeo_shader_vert.glsl")
+                .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/deferred_render/gGeo_shader_frag.glsl");
+            m_shaderGeometryPass = shaderGeometryPassBuilder.build();
+
+            ShaderBuilder shaderLightingPassBuilder;
+            shaderLightingPassBuilder
+                .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/deferred_render/deferred_gLight_vert.glsl")
+                .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/deferred_render/deferred_gLight_frag.glsl");
+            m_shaderLightingPass = shaderLightingPassBuilder.build();
+
+
+            ShaderBuilder deferredLightShaderBuilder;
+            deferredLightShaderBuilder
+                .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/lights/deferred_light_vert.glsl")
+                .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/lights/light_frag.glsl");
+            m_deferredLightShader = deferredLightShaderBuilder.build();
+
+            ShaderBuilder deferredFBOdebugShaderBuilder;
+            deferredFBOdebugShaderBuilder
+                .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/deferred_render/deferred_fbo_debug_vert.glsl")
+                .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/deferred_render/deferred_fbo_debug_frag.glsl");
+            m_deferredDebugShader = deferredFBOdebugShaderBuilder.build();
+
+            glGenFramebuffers(1, &gBuffer);
+            glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+
+            if (gPos.gBufferCode == SSAO_GBUFFER_POS)
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPos.getTextureRef(), 0);
+            if (gNor.gBufferCode == SSAO_GBUFFER_NOR)
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNor.getTextureRef(), 0);
+            if (gCol.gBufferCode == SSAO_GBUFFER_COL)
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gCol.getTextureRef(), 0);
+
+            GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+            glDrawBuffers(3, attachments);
+
+            // render buffer
+            glGenRenderbuffers(1, &renderDepth);
+            glBindRenderbuffer(GL_RENDERBUFFER, renderDepth);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WIDTH, HEIGHT);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderDepth);
+
+            // finally check if framebuffer is complete
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+                std::cout << "Framebuffer not complete!" << std::endl;
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+            //genSSAOFrameBuffer();
+
+            lights.clear();
+            for (GLint i = 0; i < MAX_LIGHT_CNT; ++i) {
+
+                float xPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 3.0);
+                float yPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 4.0);
+                float zPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 3.0);
+                // also calculate random color
+                float rColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.)
+                float gColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.)
+                float bColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.)
+
+                auto lightPos = glm::vec3(xPos, yPos, zPos);
+                lights.push_back(
+                    { lightPos,glm::vec3(rColor, gColor, bColor),-lightPos,false,false }
+                );
+            }
+        }
+        catch (std::runtime_error e)
+        {
+            std::cerr << e.what() << std::endl;
+        }
+
+        defRenderBufferGenerated = true;
+    }
+}
+
+void Application::deferredRenderPipeLine()
+{
+
+}
+
+// unused
+void Application::genSSAOFrameBuffer()
+{
+    glGenFramebuffers(1, &ssaoFBO);
+    glGenFramebuffers(1, &ssaoBlurFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
+
+    if (ssaoColorBuff.gBufferCode == SSAO_COLOR_BUFF)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBuff.getTextureRef(), 0);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "SSAO Framebuffer not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
+    if (ssaoColorBlurBuff.gBufferCode == SSAO_COLOR_BLUR)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBlurBuff.getTextureRef(), 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "SSAO Framebuffer not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
+    std::default_random_engine generator;
+
+    // generate sample kernel
+    std::vector<glm::vec3> ssaoKernel = generateSSAOKernel();
+
+    // generate noise
+    std::vector<glm::vec3> ssaoNoise = generateSSAONoise();
+
+    ssaoNoiseTex = std::move(ssaoBufferTex(SSAO_NOISE_TEX, ssaoNoise));
+}
+
 void Application::imgui() {
     ImGui::Begin("Assignment 2 Demo");
+
+    ImGui::Separator();
+    ImGui::Checkbox("Switch to Deferred Rendering Pipeline", &ssaoEnabled);
 
     ImGui::Separator();
 
