@@ -4,7 +4,7 @@
 // Constructor
 Application::Application()
     : m_window("Final Project", glm::ivec2(1024, 1024), OpenGLVersion::GL41)
-    , texturePath("resources/texture/wall.jpg")
+    , texturePath("resources/texture/brickwall.jpg")
     , m_texture(RESOURCE_ROOT "resources/texture/checkerboard.png")
     , m_projectionMatrix(glm::perspective(glm::radians(80.0f), m_window.getAspectRatio(), 0.1f, 30.0f))
     , m_viewMatrix(glm::lookAt(glm::vec3(-1, 1, -1), glm::vec3(0), glm::vec3(0, 1, 0)))
@@ -63,7 +63,7 @@ Application::Application()
 
     glm::vec3 look_at = { 0.0, 1.0, -1.0 };
     glm::vec3 rotations = { 0.2, 0.0, 0.0 };
-    auto dist = 1.0;
+    float dist = 1.0;
     trackball.setCamera(look_at, rotations, dist);
 
     m_window.registerKeyCallback([this](int key, int scancode, int action, int mods) {
@@ -139,7 +139,7 @@ Application::Application()
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/light_frag.glsl");
         m_lightShader = lightShaderBuilder.build();
 
-				ShaderBuilder skyBoxBuilder;
+        ShaderBuilder skyBoxBuilder;
         skyBoxBuilder
             .addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/skybox_vert.glsl")
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/skybox_frag.glsl");
@@ -151,7 +151,7 @@ Application::Application()
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_skybox_frag.glsl");
         m_hdrSkyBoxShader = hdrSkyBoxBuilder.build();
 			
-				ShaderBuilder borderShader;
+        ShaderBuilder borderShader;
         borderShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/border_vert.glsl");
         borderShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/border_frag.glsl");
         m_borderShader = borderShader.build();
@@ -160,13 +160,14 @@ Application::Application()
         pointShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/border_vert.glsl");
         pointShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/border_frag.glsl");
         m_pointShader = pointShader.build();
-
+        
         ShaderBuilder postProcessShader;
         postProcessShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/postProcess_vert.glsl");
         postProcessShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/postProcess_frag.glsl");
         m_postProcessShader = postProcessShader.build();
 
         initPostProcess();
+        applyNormalTexture();
     }
     catch (ShaderLoadingException e) {
         std::cerr << e.what() << std::endl;
@@ -179,6 +180,29 @@ Application::Application()
     catch (shadowLoadingException e) {
         std::cerr << e.what() << std::endl;
     }
+}
+
+void Application::applyNormalTexture()
+{
+    // Normal texture image
+    int width, height, sourceNumChannels;
+    // stbi_uc* pixels = stbi_load(RESOURCE_ROOT "resources/normal_mapping/checkerboard_normal.png", &width, &height, &sourceNumChannels, STBI_rgb);
+    stbi_uc* pixels = stbi_load(RESOURCE_ROOT "resources/normal_mapping/brickwall_normal.png", &width, &height, &sourceNumChannels, STBI_rgb);
+
+    // Normal texture
+    glGenTextures(1, &normalTex);
+    glBindTexture(GL_TEXTURE_2D, normalTex);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+    // glGenerateMipmap(GL_TEXTURE_2D);
+
+    // Free the CPU memory after we copied the image to the GPU.
+    stbi_image_free(pixels);
 }
 
 void Application::update() {
@@ -235,7 +259,7 @@ void Application::update() {
         for (GPUMesh& mesh : m_meshes) {
             //shadow maps generates the shadows
         #pragma region shadow Map Genereates
-                    if (FALSE)
+                    if (false)
                     {
                         mesh.drawShadowMap(m_shadowShader, lightMVP, m_shadowTex.getFramebuffer(), SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
                     }
@@ -323,6 +347,15 @@ void Application::update() {
             glUniform1i(m_selShader->getUniformLocation("useEnvMap"), envMapEnabled);
             glBindVertexArray(0);
 
+            if (useNormalMapping) {
+                glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_TRUE);
+                glActiveTexture(GL_TEXTURE3);
+                glBindTexture(GL_TEXTURE_2D, normalTex);
+                glUniform1i(m_selShader->getUniformLocation("normalTex"), 3);
+            } else {
+                glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_FALSE);
+            }
+
             // Generate UBOs and draw
             if (multiLightShadingEnabled) {
                 genUboBufferObj(lights, lightUBO, MAX_LIGHT_CNT);
@@ -360,8 +393,6 @@ void Application::update() {
                 mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
             }
 
-            genUboBufferObj(selectedLight, lightUBO);
-            mesh.draw(*m_selShader);
             renderMiniMap();
            	
             int lightsCnt = static_cast<int>(lights.size());
@@ -442,6 +473,11 @@ void Application::update() {
 
         m_window.swapBuffers();
     }
+
+    // if (useNormalMapping) {
+    // Clean up normal mapping texture
+    glDeleteTextures(1, &normalTex);
+    // }
 }
 
 void Application::generateSkyBox()
@@ -720,6 +756,10 @@ void Application::imgui() {
     }
 
     ImGui::Separator();
+    ImGui::Text("Normal mapping");
+    ImGui::Checkbox("Normal Mapping Enabled", &useNormalMapping);
+
+    ImGui::Separator();
     ImGui::Text("Lights");
     ImGui::Checkbox("MultiLightShading", &multiLightShadingEnabled);
     itemStrings.clear();
@@ -811,6 +851,7 @@ void Application::renderMiniMap() {
 
     const glm::mat4 minimapVP = minimap.projectionMatrix() * minimap.viewMatrix() * m_modelMatrix;
     glm::vec4 cameraPosInMinimap = minimapVP * glm::vec4(selectedCamera->cameraPos(), 1.0f);
+
     cameraPosInMinimap /= cameraPosInMinimap.w; // 透视除法，得到标准化设备坐标
     
     drawCameraPositionOnMinimap(cameraPosInMinimap);

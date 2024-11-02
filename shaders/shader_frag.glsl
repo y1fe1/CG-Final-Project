@@ -44,6 +44,9 @@ uniform sampler2D colorMap;
 uniform bool hasTexCoords;
 uniform bool useMaterial;
 
+uniform bool useNormalMapping;
+uniform sampler2D normalTex;
+
 uniform vec3 ambientColor;
 
 uniform mat3 normalModelMatrix;
@@ -55,6 +58,7 @@ uniform bool useEnvMap;
 in vec3 fragPosition;
 in vec3 fragNormal;
 in vec2 fragTexCoord;
+in mat3 TBN;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -106,6 +110,19 @@ float getLightAttenuationFactor(vec3 lightDir) {
 
 void main()
 {
+    vec3 normal;
+    
+    if (useNormalMapping)
+    {
+        normal = texture(normalTex, fragTexCoord).rgb; // Take the normal from the normal map texture.
+        normal = normal * 2.0 - 1.0; // Re-convert from [0, 1] to [-1, 1].
+        normal = normalize(TBN * normal); // Transform with TBN.
+    }
+    else
+    {
+        // Take the given normal from the vertex shader instead.
+        normal = normalize(fragNormal);
+    }
 
     vec4 fragLightCoord = lightMVP * vec4(fragPosition, 1.0);
     // Convert to normalized device coordinates
@@ -123,8 +140,6 @@ void main()
     float shadowFactor = (shadowEnabled)? shadowFactorCal(shadowMapCoord,fragLightDepth) : 0.0f;
 
     vec3 Specular = vec3(0.0f);
-
-    vec3 normal = normalize(fragNormal);
 
     vec3 viewDir = normalize(viewPos - fragPosition);
     vec3 lightDir = normalize(position - fragPosition);

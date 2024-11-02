@@ -9,6 +9,7 @@
 
 #define MAX_LIGHT_CNT 10
 #include "minimap.h"
+#include <stb/stb_image.h>
 
 class Application {
 private:
@@ -126,6 +127,11 @@ private:
     const int SHADOWTEX_HEIGHT = 1024;
     
     void imgui();
+
+    //Normal mapping
+    bool useNormalMapping { false };
+    GLuint normalTex;
+    void applyNormalTexture();
     
     //Minimap
     void renderMiniMap();
