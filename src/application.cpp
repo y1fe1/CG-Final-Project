@@ -39,20 +39,6 @@ Application::Application()
         { glm::vec3(-1, 3, 2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
     );
 
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/normal.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/albedo.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/metallic.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/roughness.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/ao.png")));
-
-    //lights.push_back(
-    //    { glm::vec3(2, 1, 2), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
-    //);
-    
-    //lights.push_back(
-    //    { glm::vec3(1,1, 3), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
-    //);
-
     // init normal material
     m_Material.kd = glm::vec3{ 0.5f, 0.5f, 1.0f };
     m_Material.ks = glm::vec3{ 0.1f, 1.0f, 0.1f };
@@ -64,7 +50,7 @@ Application::Application()
     glm::vec3 look_at = { 0.0, 1.0, -1.0 };
     glm::vec3 rotations = { 0.2, 0.0, 0.0 };
     auto dist = 1.0;
-    trackball.setCamera(look_at, rotations, dist);
+    //trackball.setCamera(look_at, rotations, dist);
 
     m_window.registerKeyCallback([this](int key, int scancode, int action, int mods) {
         if (action == GLFW_PRESS)
@@ -82,6 +68,8 @@ Application::Application()
         });
 
     // generate env maps
+    initPBRTexures();
+
     generateSkyBox();
 
     generateHdrMap();
@@ -90,20 +78,8 @@ Application::Application()
     glm::ivec2 windowSizes = m_window.getWindowSize();
     glViewport(0, 0, windowSizes.x, windowSizes.y);
 
-    // === Create Material Texture if its valid path ===
-    std::string textureFullPath = std::string(RESOURCE_ROOT) + texturePath;
-    std::vector<Mesh> cpuMeshes = loadMesh(RESOURCE_ROOT "resources/sphere.obj"); //"resources/texture/Cerberus_by_Andrew_Maximov/Cerberus_LP.obj
-
-    if (std::filesystem::exists((textureFullPath))) {
-        std::shared_ptr texPtr = std::make_shared<Image>(textureFullPath);
-        for (auto& mesh : cpuMeshes) {
-            mesh.material.kdTexture = texPtr;
-        }
-    }
-
     //m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/sphere.obj");
-    m_meshes = GPUMesh::loadMeshGPU(cpuMeshes);  // load mesh from mesh list so we have more freedom on setting up each mesh
-
+    initMaterialTexture();
 
     // ===  Create All Shader ===
     try {
@@ -174,7 +150,8 @@ Application::Application()
 
     // === Create Shadow Texture ===
     try {
-        m_shadowTex = ShadowTexture(SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
+        //m_shadowTex = ShadowTexture(SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
+        m_shadowTex = ShadowTexture(WINDOW_WIDTH, WINDOW_HEIGHT);
     }
     catch (shadowLoadingException e) {
         std::cerr << e.what() << std::endl;
@@ -184,12 +161,18 @@ Application::Application()
 void Application::update() {
     while (!m_window.shouldClose()) {
         m_window.updateInput();
+        windowSizes = m_window.getWindowSize(); 
+
+        //GLint viewport[4];
+        //glGetIntegerv(GL_VIEWPORT, viewport);
+        //std::cout << "Current viewport: x = " << viewport[0] << ", y = " << viewport[1]
+        //    << ", width = " << viewport[2] << ", height = " << viewport[3] << std::endl;
+        //std::cout << "Window viewport: x = " << windowSizes[0] << ", y = " << windowSizes[1] << "." << std::endl;
 
         m_materialChangedByUser = false;
 
         this->imgui();
-
-        //selectedCamera->updateInput();
+        selectedCamera->updateInput();
         m_viewMatrix = selectedCamera->viewMatrix();
 
         if (usePostProcess) {
@@ -197,49 +180,56 @@ void Application::update() {
             glBindFramebuffer(GL_FRAMEBUFFER, framebufferPostProcess);
             glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            GLint currentFramebuffer;
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFramebuffer);
+             std::cout << "IN ENTRY, Current Framebuffer ID: " << currentFramebuffer << std::endl;
+
         }
         else {
             // 绑定默认帧缓冲对象（屏幕）
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             //glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
         }
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 
-        //glClearDepth(1.0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClearDepth(1.0);
 
-        //glDisable(GL_CULL_FACE);
+        glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
- 
-        const glm::vec3 cameraPos = trackball.position();
-        //const glm::vec3 cameraPos = selectedCamera->cameraPos();
-        const glm::mat4 model{ 1.0f };
 
-        //const glm::mat4 view = m_viewMatrix;
-        const glm::mat4 view = trackball.viewMatrix();
-        const glm::mat4 projection = trackball.projectionMatrix();
 
-        glm::mat4 lightMVP;
-        GLfloat near_plane = 0.5f, far_plane = 30.0f;
-        glm::mat4 mainProjectionMatrix = m_projectionMatrix;//glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
+        //START Debug Trackball
+        //const glm::vec3 cameraPos = trackball.position();
+        const glm::vec3 cameraPos = selectedCamera->cameraPos();
+        //const glm::mat4 model{ 1.0f };
+
+        const glm::mat4 view = m_viewMatrix;
+        const glm::mat4 projection = m_projectionMatrix;
+        //const glm::mat4 view = trackball.viewMatrix();
+        //const glm::mat4 projection = trackball.projectionMatrix();
+
+        //glm::mat4 lightMVP;
+        //GLfloat near_plane = 0.5f, far_plane = 30.0f;
+        //glm::mat4 mainProjectionMatrix = m_projectionMatrix;//glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
+        //glm::mat4 lightViewMatrix = glm::lookAt(selectedLight->position, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        //lightMVP = mainProjectionMatrix * lightViewMatrix;
+
+        const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
         glm::mat4 lightViewMatrix = glm::lookAt(selectedLight->position, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        lightMVP = mainProjectionMatrix * lightViewMatrix;
+        glm::mat4 lightMVP = m_projectionMatrix * lightViewMatrix;
+        //glm::mat4 mvpMatrix = projection * view * model;
+        //FINISH
+        
 
-        glm::mat4 mvpMatrix = projection * view * model;
         //const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
         const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(m_modelMatrix));
 
         // Actualy Mesh Render Loop
-        #pragma region Mesh render loop
         for (GPUMesh& mesh : m_meshes) {
             //shadow maps generates the shadows
-        #pragma region shadow Map Genereates
-                    if (FALSE)
-                    {
-                        mesh.drawShadowMap(m_shadowShader, lightMVP, m_shadowTex.getFramebuffer(), SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
-                    }
-        #pragma endregion
 
             // set new Material every time it is updated
             GLuint newUBOMaterial;
@@ -250,24 +240,6 @@ void Application::update() {
             // generate UBO for shadowSetting
             GLuint shadowSettingUbo;
             genUboBufferObj(shadowSettings, shadowSettingUbo);
-
-            //// Draw mesh into depth buffer but disable color writes.
-            //glDepthMask(GL_TRUE);
-            //glDepthFunc(GL_LEQUAL);
-            //glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-
-            //m_debugShader.bind();
-            //glUniformMatrix4fv(m_debugShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
-            //glUniformMatrix3fv(m_debugShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
-            //glUniformMatrix4fv(m_debugShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
-            //mesh.drawBasic(m_debugShader);
-
-            //// Draw the mesh again for each light / shading model.
-            //glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); // Enable color writes.
-            //glDepthMask(GL_FALSE); // Disable depth writes.
-            //glDepthFunc(GL_EQUAL); // Only draw a pixel if it's depth matches the value stored in the depth buffer.
-            //glEnable(GL_BLEND); // Enable blending.
-            //glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
             if (multiLightShadingEnabled) {
                 m_selShader = usePbrShading ? &m_pbrShader : &m_multiLightShader;
@@ -284,7 +256,8 @@ void Application::update() {
             glUniformMatrix3fv(m_selShader->getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
             glUniformMatrix4fv(m_selShader->getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
             glUniformMatrix4fv(m_selShader->getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
-            glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+            //glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos)); // 112
+            glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(selectedLight->position));
 
             // Texture and material settings
             bool hasTexCoords = mesh.hasTextureCoords();
@@ -306,8 +279,8 @@ void Application::update() {
             m_selShader->bindUniformBlock("shadowSetting", 2, shadowSettingUbo);
 
             glBindVertexArray(mesh.getVao());
-                m_shadowTex.bind(GL_TEXTURE1);
-                glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
+            m_shadowTex.bind(GL_TEXTURE1);
+            glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
             glBindVertexArray(0);
 
             //// Restore default depth test settings and disable blending.
@@ -323,47 +296,28 @@ void Application::update() {
             glUniform1i(m_selShader->getUniformLocation("useEnvMap"), envMapEnabled);
             glBindVertexArray(0);
 
+            GLint viewport[4];
+            glGetIntegerv(GL_VIEWPORT, viewport);
+            std::cout << "Viewport: " << viewport[0] << ", " << viewport[1] << ", " << viewport[2] << ", " << viewport[3] << "\n";
+
             // Generate UBOs and draw
-            if (multiLightShadingEnabled) {
-                genUboBufferObj(lights, lightUBO, MAX_LIGHT_CNT);
-                glUniform1i(m_selShader->getUniformLocation("LightCount"), static_cast<GLint>(lights.size()));
+            drawMultiLightShader(mesh, multiLightShadingEnabled);
 
-                if (usePbrShading) {
+            GLint currentFramebuffer;
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFramebuffer);
+            std::cout << "AFTER drawMultiLightShader, Current Framebuffer ID: " << currentFramebuffer << std::endl;
 
-                    genUboBufferObj(m_PbrMaterial, PbrUBO);
-
-                    glUniform1i(m_selShader->getUniformLocation("normalMap"), true ? 10 : -1);
-                    glUniform1i(m_selShader->getUniformLocation("albedoMap"), true ? 11 : -1);
-                    glUniform1i(m_selShader->getUniformLocation("metallicMap"), true ? 12 : -1);
-                    glUniform1i(m_selShader->getUniformLocation("roughnessMap"), true ? 13 : -1);
-                    glUniform1i(m_selShader->getUniformLocation("aoMap"), true ? 14 : -1);
-
-                    hdrIrradianceMap.bind(GL_TEXTURE15);
-                    glUniform1i(m_selShader->getUniformLocation("irradianceMap"), true ? 15 : -1);
-
-                    hdrPrefilteredMap.bind(GL_TEXTURE16);
-                    glUniform1i(m_selShader->getUniformLocation("prefilteredMap"), true ? 16 : -1);
-
-                    BRDFTexture.bind(GL_TEXTURE17);
-                    glUniform1i(m_selShader->getUniformLocation("brdfLUT"), true ? 17 : -1);
-
-                    glUniform1i(m_selShader->getUniformLocation("hdrEnvMapEnabled"), hdrMapEnabled);
-
-                    mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
-                }
-                else {
-                    mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
-                }
-            }
-            else {
-                genUboBufferObj(*selectedLight, lightUBO); // Pass single Light
-                mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
-            }
 
             genUboBufferObj(selectedLight, lightUBO);
             mesh.draw(*m_selShader);
+
             renderMiniMap();
-           	
+
+            //GLint currentFramebuffer;
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFramebuffer);
+            std::cout << "AFTER renderMiniMap, Current Framebuffer ID: " << currentFramebuffer << std::endl;
+
+
             int lightsCnt = static_cast<int>(lights.size());
             glBindVertexArray(mesh.getVao());
             m_lightShader.bind();
@@ -387,47 +341,23 @@ void Application::update() {
             }
             glBindVertexArray(0);
 
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFramebuffer);
+            std::cout << "BEFORE drawBasic, Current Framebuffer ID: " << currentFramebuffer << std::endl;
+
             mesh.drawBasic(m_lightShader);
         }
-#pragma endregion
+        
+        //Draw Env Map
+        //drawEnvMap(envMapEnabled, hdrMapEnabled);//MARK
+        GLint viewport[4];
+        glGetIntegerv(GL_VIEWPORT, viewport);
+        std::cout << "Viewport: " << viewport[0] << ", " << viewport[1] << ", " << viewport[2] << ", " << viewport[3] << "\n";
 
-        // Render Enviroment Mapping at the end
-        if (envMapEnabled) {
-
-            glm::mat4 viewModel = glm::mat4(glm::mat3(view));
-
-            glDepthFunc(GL_LEQUAL);
-            if (hdrMapEnabled) {
-                m_hdrSkyBoxShader.bind();
-                glUniformMatrix4fv(m_hdrSkyBoxShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(viewModel));
-                glUniformMatrix4fv(m_hdrSkyBoxShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
-
-                hdrCubeMap.bind(GL_TEXTURE0);
-                glUniform1i(m_hdrSkyBoxShader.getUniformLocation("hdrEnvMap"), 0);
-
-                renderHDRCubeMap(cubeVAO, cubeVBO, hdrMapVertices, 288);
-            } 
-            else {
-
-                m_skyBoxShader.bind();
-							
- 								//glm::mat4 projection = glm::perspective(glm::radians(80.0f), float(WIDTH)/float(HEIGHT), 0.1f, 100.0f);
-                glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(viewModel));
-                glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
-
-                glBindVertexArray(skyboxVAO);
-                skyboxTexture.bind(GL_TEXTURE0);
-
-                glUniform1i(m_skyBoxShader.getUniformLocation("skybox"), 0);
-                glDrawArrays(GL_TRIANGLES, 0, 36);
-                glBindVertexArray(0);
-            }
-
-            glDepthFunc(GL_LESS);
-        }
-							
         if (usePostProcess) {
             // 绑定默认帧缓冲对象，将结果绘制到屏幕
+            GLint currentFramebuffer;
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFramebuffer);
+            std::cout << "IN usePostProcess, Current Framebuffer ID: " << currentFramebuffer << std::endl;
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             runPostProcess();
@@ -501,7 +431,8 @@ void Application::generateHdrMap()
         hdrTextureMap.bind(GL_TEXTURE0);
         glUniform1i(m_hdrToCubeShader.getUniformLocation("equirectangularMap"), 0);
 
-        glViewport(0, 0, 1024, 1024);
+        //glViewport(0, 0, 1024, 1024);//VIEWPORT
+        glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
         glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
         for (GLuint i = 0; i < 6; ++i)
@@ -537,6 +468,7 @@ void Application::generateHdrMap()
         hdrCubeMap.bind(GL_TEXTURE0);
         glUniform1i(m_hdrToIrradianceShader.getUniformLocation("environmentMap"), 0);
 
+        glViewport(0, 0, 32, 32);
         glViewport(0, 0, 32, 32);
 
         glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
@@ -816,7 +748,7 @@ void Application::renderMiniMap() {
     drawCameraPositionOnMinimap(cameraPosInMinimap);
 
     // 恢复主视口
-    glViewport(0, 0, 1024, 1024);
+    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
     drawMiniMapBorder();
     glBindBuffer(GL_ARRAY_BUFFER, previousVBO);
 }
@@ -918,7 +850,7 @@ void Application::initPostProcess() {
     glBindFramebuffer(GL_FRAMEBUFFER, framebufferPostProcess);
 
     // 创建颜色纹理附件
-    //glActiveTexture(GL_TEXTURE1); // 激活 GL_TEXTURE1
+    //glActiveTexture(GL_TEXTURE7); // 激活 GL_TEXTURE7
     glGenTextures(1, &texturePostProcess);
     glBindTexture(GL_TEXTURE_2D, texturePostProcess);
     //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WIDTH, HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
@@ -946,27 +878,41 @@ void Application::initPostProcess() {
 
 void Application::runPostProcess() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // 清除默认帧缓冲区，避免重影
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     // 使用后期处理着色器
     m_postProcessShader.bind();
 
     // 激活并绑定纹理单元
-    glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(GL_TEXTURE7);
     glBindTexture(GL_TEXTURE_2D, texturePostProcess); // 绑定自定义帧缓冲对象的颜色纹理附件
 
     // 设置着色器中的采样器
-    glUniform1i(m_postProcessShader.getUniformLocation("scene"), 0);
+    glUniform1i(m_postProcessShader.getUniformLocation("scene"), 7);
 
-
+    GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
     glDisable(GL_DEPTH_TEST);
     // 渲染全屏四边形，应用后期处理效果
-    renderFullScreenQuad();
-    glEnable(GL_DEPTH_TEST);
+    GLint currentFramebuffer;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFramebuffer);
+    std::cout << "IN runPostProcess, Current Framebuffer ID: " << currentFramebuffer << std::endl;
 
+    renderFullScreenQuad();
+
+    glEnable(GL_DEPTH_TEST);
+    //if (depthTestEnabled) {
+    //    glEnable(GL_DEPTH_TEST);
+    //}
+    //else {
+    //    glDisable(GL_DEPTH_TEST);
+    //}
 }
 
 void Application::renderFullScreenQuad() {
     static unsigned int quadVAO = 0;
     static unsigned int quadVBO;
+
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
     if (quadVAO == 0) {
@@ -1000,4 +946,103 @@ void Application::renderFullScreenQuad() {
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
+}
+
+
+void Application::initPBRTexures() {
+
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/normal.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/albedo.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/metallic.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/roughness.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/ao.png")));
+}
+
+void Application::initMaterialTexture(){
+    // === Create Material Texture if its valid path ===
+    std::string textureFullPath = std::string(RESOURCE_ROOT) + texturePath;
+    std::vector<Mesh> cpuMeshes = loadMesh(RESOURCE_ROOT "resources/sphere.obj"); //"resources/texture/Cerberus_by_Andrew_Maximov/Cerberus_LP.obj
+
+    if (std::filesystem::exists((textureFullPath))) {
+        std::shared_ptr texPtr = std::make_shared<Image>(textureFullPath);
+        for (auto& mesh : cpuMeshes) {
+            mesh.material.kdTexture = texPtr;
+        }
+    }
+    m_meshes = GPUMesh::loadMeshGPU(cpuMeshes);  // load mesh from mesh list so we have more freedom on setting up each mesh
+}
+
+void Application::drawEnvMap(bool envMapEnabled, bool hdrMapEnabled) {
+    if (envMapEnabled) {
+        glm::mat4 projection = m_projectionMatrix;
+        glm::mat4 viewModel = glm::mat4(glm::mat3(m_viewMatrix));
+
+        glDepthFunc(GL_LEQUAL);
+        if (hdrMapEnabled) {
+            m_hdrSkyBoxShader.bind();
+            glUniformMatrix4fv(m_hdrSkyBoxShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(viewModel));
+            glUniformMatrix4fv(m_hdrSkyBoxShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+            hdrCubeMap.bind(GL_TEXTURE0);
+            glUniform1i(m_hdrSkyBoxShader.getUniformLocation("hdrEnvMap"), 0);
+
+            renderHDRCubeMap(cubeVAO, cubeVBO, hdrMapVertices, 288);
+        }
+        else {
+
+            m_skyBoxShader.bind();
+
+            //glm::mat4 projection = glm::perspective(glm::radians(80.0f), float(WIDTH)/float(HEIGHT), 0.1f, 100.0f);
+            glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(viewModel));
+            glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+            glBindVertexArray(skyboxVAO);
+            skyboxTexture.bind(GL_TEXTURE0);
+
+            glUniform1i(m_skyBoxShader.getUniformLocation("skybox"), 0);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+            glBindVertexArray(0);
+        }
+
+        glDepthFunc(GL_LESS);
+    }
+}
+
+
+void Application::drawMultiLightShader(GPUMesh& mesh,bool multiLightShadingEnabled) {
+    if (multiLightShadingEnabled) {
+        genUboBufferObj(lights, lightUBO, MAX_LIGHT_CNT);
+        glUniform1i(m_selShader->getUniformLocation("LightCount"), static_cast<GLint>(lights.size()));
+
+        if (usePbrShading) {
+
+            genUboBufferObj(m_PbrMaterial, PbrUBO);
+
+            glUniform1i(m_selShader->getUniformLocation("normalMap"), true ? 10 : -1);
+            glUniform1i(m_selShader->getUniformLocation("albedoMap"), true ? 11 : -1);
+            glUniform1i(m_selShader->getUniformLocation("metallicMap"), true ? 12 : -1);
+            glUniform1i(m_selShader->getUniformLocation("roughnessMap"), true ? 13 : -1);
+            glUniform1i(m_selShader->getUniformLocation("aoMap"), true ? 14 : -1);
+
+            hdrIrradianceMap.bind(GL_TEXTURE15);
+            glUniform1i(m_selShader->getUniformLocation("irradianceMap"), true ? 15 : -1);
+
+            hdrPrefilteredMap.bind(GL_TEXTURE16);
+            glUniform1i(m_selShader->getUniformLocation("prefilteredMap"), true ? 16 : -1);
+
+            BRDFTexture.bind(GL_TEXTURE17);
+            glUniform1i(m_selShader->getUniformLocation("brdfLUT"), true ? 17 : -1);
+
+            glUniform1i(m_selShader->getUniformLocation("hdrEnvMapEnabled"), hdrMapEnabled);
+
+            mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
+        }
+        else {
+            mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
+        }
+    }
+    else {
+        genUboBufferObj(*selectedLight, lightUBO); // Pass single Light
+        mesh.draw(*m_selShader, lightUBO, multiLightShadingEnabled);
+    }
 }

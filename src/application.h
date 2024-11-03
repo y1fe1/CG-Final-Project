@@ -122,8 +122,8 @@ private:
     shadowSetting shadowSettings;
     ShadowTexture m_shadowTex;
 
-    const int SHADOWTEX_WIDTH = 1024;
-    const int SHADOWTEX_HEIGHT = 1024;
+    //const int SHADOWTEX_WIDTH = 1024;
+    //const int SHADOWTEX_HEIGHT = 1024;
     
     void imgui();
     
@@ -141,8 +141,17 @@ private:
     GLuint framebufferPostProcess;
     GLuint texturePostProcess;
     GLuint depthbufferPostProcess;
-    const int WINDOW_WIDTH = 1920;
-    const int WINDOW_HEIGHT = 1080;
+    const int WINDOW_WIDTH = 1024;
+    const int WINDOW_HEIGHT = 1024;
+    glm::ivec2 windowSizes;
+
+    //Re-Structure the code
+    void initPBRTexures();
+    void initMaterialTexture();
+
+    void drawEnvMap(bool envMapEnabled, bool hdrMapEnabled);
+    void drawMultiLightShader(GPUMesh& mesh, bool multiLightShadingEnabled);
+
 
 public:
     Application();

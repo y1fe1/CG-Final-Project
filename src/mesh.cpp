@@ -163,6 +163,12 @@ void GPUMesh::draw(const Shader& drawingShader, GLuint& drawingUBO, bool multiLi
 
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
     
+    //GLint viewport[4];
+    //glGetIntegerv(GL_VIEWPORT, viewport);
+    //std::cout << "Current viewport: x = " << viewport[0] << ", y = " << viewport[1]
+    //    << ", width = " << viewport[2] << ", height = " << viewport[3] << std::endl;
+
+
     GLenum err;
     while ((err = glGetError()) != GL_NO_ERROR) {
         std::cerr << "OpenGL Error: " << err << std::endl;
