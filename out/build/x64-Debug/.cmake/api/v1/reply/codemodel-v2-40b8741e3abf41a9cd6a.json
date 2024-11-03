@@ -1,0 +1,428 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1
+					],
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						3,
+						4
+					]
+				},
+				{
+					"build" : "framework",
+					"childIndexes" : 
+					[
+						2
+					],
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "framework",
+					"targetIndexes" : 
+					[
+						0
+					]
+				},
+				{
+					"build" : "framework/third_party",
+					"childIndexes" : 
+					[
+						3,
+						5,
+						7,
+						8,
+						9,
+						10,
+						12,
+						13,
+						14,
+						15
+					],
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 1,
+					"projectIndex" : 0,
+					"source" : "framework/third_party"
+				},
+				{
+					"build" : "framework/third_party/catch2",
+					"childIndexes" : 
+					[
+						4
+					],
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 1,
+					"source" : "framework/third_party/catch2"
+				},
+				{
+					"build" : "framework/third_party/catch2/src",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10"
+					},
+					"parentIndex" : 3,
+					"projectIndex" : 1,
+					"source" : "framework/third_party/catch2/src",
+					"targetIndexes" : 
+					[
+						1,
+						2
+					]
+				},
+				{
+					"build" : "framework/third_party/glm",
+					"childIndexes" : 
+					[
+						6
+					],
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.2"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 2,
+					"source" : "framework/third_party/glm",
+					"targetIndexes" : 
+					[
+						11
+					]
+				},
+				{
+					"build" : "framework/third_party/glm/glm",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.2"
+					},
+					"parentIndex" : 5,
+					"projectIndex" : 2,
+					"source" : "framework/third_party/glm/glm"
+				},
+				{
+					"build" : "framework/third_party/fmt",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 0,
+					"source" : "framework/third_party/fmt",
+					"targetIndexes" : 
+					[
+						5
+					]
+				},
+				{
+					"build" : "framework/third_party/tinyobjloader",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 0,
+					"source" : "framework/third_party/tinyobjloader",
+					"targetIndexes" : 
+					[
+						10
+					]
+				},
+				{
+					"build" : "framework/third_party/glad",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 0,
+					"source" : "framework/third_party/glad",
+					"targetIndexes" : 
+					[
+						6
+					]
+				},
+				{
+					"build" : "framework/third_party/glfw3",
+					"childIndexes" : 
+					[
+						11
+					],
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.0"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 3,
+					"source" : "framework/third_party/glfw3"
+				},
+				{
+					"build" : "framework/third_party/glfw3/src",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.0"
+					},
+					"parentIndex" : 10,
+					"projectIndex" : 3,
+					"source" : "framework/third_party/glfw3/src",
+					"targetIndexes" : 
+					[
+						7,
+						12
+					]
+				},
+				{
+					"build" : "framework/third_party/imgui",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 0,
+					"source" : "framework/third_party/imgui",
+					"targetIndexes" : 
+					[
+						8
+					]
+				},
+				{
+					"build" : "framework/third_party/stb",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 0,
+					"source" : "framework/third_party/stb"
+				},
+				{
+					"build" : "framework/third_party/nativefiledialog",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 0,
+					"source" : "framework/third_party/nativefiledialog",
+					"targetIndexes" : 
+					[
+						9
+					]
+				},
+				{
+					"build" : "framework/third_party/toml",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.11"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 0,
+					"source" : "framework/third_party/toml"
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"childIndexes" : 
+					[
+						1,
+						2,
+						3
+					],
+					"directoryIndexes" : 
+					[
+						0,
+						1,
+						2,
+						7,
+						8,
+						9,
+						12,
+						13,
+						14,
+						15
+					],
+					"name" : "ComputerGraphics",
+					"targetIndexes" : 
+					[
+						0,
+						3,
+						4,
+						5,
+						6,
+						8,
+						9,
+						10
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						3,
+						4
+					],
+					"name" : "Catch2",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						1,
+						2
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						5,
+						6
+					],
+					"name" : "glm",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						11
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						10,
+						11
+					],
+					"name" : "GLFW",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						7,
+						12
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 1,
+					"id" : "CGFramework::@217a96c3a62328a73ef4",
+					"jsonFile" : "target-CGFramework-Debug-3583ed145bb09038f29f.json",
+					"name" : "CGFramework",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 4,
+					"id" : "Catch2::@5d14516d7c572ca1c0b9",
+					"jsonFile" : "target-Catch2-Debug-9d3f301b001d42653791.json",
+					"name" : "Catch2",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 4,
+					"id" : "Catch2WithMain::@5d14516d7c572ca1c0b9",
+					"jsonFile" : "target-Catch2WithMain-Debug-4c726069d77ebb6177f8.json",
+					"name" : "Catch2WithMain",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "Master_TechDemo::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Master_TechDemo-Debug-151512d167aa8376c89f.json",
+					"name" : "Master_TechDemo",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "Master_TechDemo_copy_shaders::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Master_TechDemo_copy_shaders-Debug-fbbcd64aa7694dcae68e.json",
+					"name" : "Master_TechDemo_copy_shaders",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 7,
+					"id" : "fmt::@0dd0d94e1dc15276fb9a",
+					"jsonFile" : "target-fmt-Debug-fd3bedecc59370cc6e24.json",
+					"name" : "fmt",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 9,
+					"id" : "glad::@37fc3951361369fd0aab",
+					"jsonFile" : "target-glad-Debug-4283204e2ed33992e08d.json",
+					"name" : "glad",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 11,
+					"id" : "glfw::@1ea9373b6bb5e4d316d5",
+					"jsonFile" : "target-glfw-Debug-9e6c9683b6aa95d12343.json",
+					"name" : "glfw",
+					"projectIndex" : 3
+				},
+				{
+					"directoryIndex" : 12,
+					"id" : "imgui::@d93b9608dfe271870d34",
+					"jsonFile" : "target-imgui-Debug-864e94041276279c8437.json",
+					"name" : "imgui",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 14,
+					"id" : "nativefiledialog::@5dc90a60f82ed0bfb84e",
+					"jsonFile" : "target-nativefiledialog-Debug-6b2523e080abb7260057.json",
+					"name" : "nativefiledialog",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 8,
+					"id" : "tinyobjloader::@9b74d22b9aa34cf3c85f",
+					"jsonFile" : "target-tinyobjloader-Debug-70da518625a7afd2fce1.json",
+					"name" : "tinyobjloader",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 5,
+					"id" : "uninstall::@3d52fb0c6669cf922159",
+					"jsonFile" : "target-uninstall-Debug-29b4731c641dbf114625.json",
+					"name" : "uninstall",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 11,
+					"id" : "update_mappings::@1ea9373b6bb5e4d316d5",
+					"jsonFile" : "target-update_mappings-Debug-c8f6ccabfa4614fc5eda.json",
+					"name" : "update_mappings",
+					"projectIndex" : 3
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "E:/TUD/Q1_Computer_Graphics/Assignment/assignment2/assignment_2/remote/CS-4515/Assignment 2/out/build/x64-Debug",
+		"source" : "E:/TUD/Q1_Computer_Graphics/Assignment/assignment2/assignment_2/remote/CS-4515/Assignment 2"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 2
+	}
+}
