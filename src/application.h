@@ -6,6 +6,7 @@
 #include "camera.h"
 #include "Textures/cubeMapTexture.h"
 #include "Textures/hdrTexture.h"
+#include "Textures/ssaoBufferTexture.h"
 
 #define MAX_LIGHT_CNT 10
 #include "minimap.h"
@@ -56,6 +57,8 @@ private:
     Shader m_skyBoxShader;
 
     void generateSkyBox();
+
+    void generateHdrMap();
 
     // Definition HDR cubemap settings
     bool hdrMapEnabled = false;

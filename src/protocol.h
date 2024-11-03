@@ -25,8 +25,13 @@ DISABLE_WARNINGS_POP()
 #include <iostream>
 #include <vector>
 
+#include <random>
+
 inline const int WIDTH = 1920;
 inline const int HEIGHT = 1080;
+
+inline const int SHADOWTEX_WIDTH = 800;
+inline const int SHADOWTEX_HEIGHT = 600;
 
 struct textureLoadingException : public std::runtime_error {
     using std::runtime_error::runtime_error;

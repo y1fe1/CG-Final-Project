@@ -238,7 +238,7 @@ void Application::update() {
         //START Debug Trackball
         //const glm::vec3 cameraPos = trackball.position();
         const glm::vec3 cameraPos = selectedCamera->cameraPos();
-        //const glm::mat4 model{ 1.0f };
+        const glm::mat4 model{ 1.0f };
 
         const glm::mat4 view = m_viewMatrix;
         const glm::mat4 projection = m_projectionMatrix;
