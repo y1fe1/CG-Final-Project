@@ -138,6 +138,21 @@ Application::Application()
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/hdr_skybox_frag.glsl");
         m_hdrSkyBoxShader = hdrSkyBoxBuilder.build();
 
+        ShaderBuilder borderShader;
+        borderShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/border_vert.glsl");
+        borderShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/border_frag.glsl");
+        m_borderShader = borderShader.build();
+
+        ShaderBuilder pointShader;
+        pointShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/border_vert.glsl");
+        pointShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/border_frag.glsl");
+        m_pointShader = pointShader.build();
+
+        ShaderBuilder postProcessShader;
+        postProcessShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/postProcess_vert.glsl");
+        postProcessShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/postProcess_frag.glsl");
+        m_postProcessShader = postProcessShader.build();
+
         /*
         ShaderBuilder ssaoBuilder;
         ssaoBuilder
