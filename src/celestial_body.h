@@ -54,7 +54,7 @@ public:
     static CelestialBody Sun()
     {
         CelestialBody body{};
-        body.texturePath = "resources/celestial_bodies/sun.jpg";
+        body.texturePath = "resources/celestial_bodies/sun";
         body.orbitRadius = 7.5f;
         body.radius = 2.5f;
         body.stationary = true;
@@ -64,10 +64,9 @@ public:
     static CelestialBody Earth()
     {
         CelestialBody body{};
-        body.texturePath = "resources/celestial_bodies/earth.jpg";
+        body.texturePath = "resources/celestial_bodies/earth";
         body.orbitRadius = 1.4f;
         body.speed = 0.1f;
-        // body.speed = 0.001f;
         body.radius = 1.0f;
         body.yFactor = -0.2f;
         body.rotateAroundAxis = true;
@@ -77,9 +76,8 @@ public:
     static CelestialBody Moon()
     {
         CelestialBody body{};
-        body.texturePath = "resources/celestial_bodies/moon.jpg";
+        body.texturePath = "resources/celestial_bodies/moon";
         body.speed = 1.0f;
-        // body.speed = 0.003f;
         body.radius = 0.3f;
         body.yFactor = 0.7f;
         return body;

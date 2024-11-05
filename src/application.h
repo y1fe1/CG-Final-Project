@@ -54,7 +54,18 @@ private:
         std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "back.jpg")
     };
 
+    std::vector<std::filesystem::path> celestialFaces = {
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "deep_sky/right.png"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "deep_sky/left.png"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "deep_sky/top.png"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "deep_sky/bottom.png"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "deep_sky/front.png"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "deep_sky/back.png")
+    };
+
+    cubeMapTex* selectedSkybox;
     cubeMapTex skyboxTexture;
+    cubeMapTex celestialSkyboxTexture;
     GLuint skyboxVAO,skyboxVBO;
 
     Shader m_skyBoxShader;

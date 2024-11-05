@@ -20,6 +20,7 @@ Application::Application()
 
     //init skyboxTex
     , skyboxTexture(faces)
+    , celestialSkyboxTexture(celestialFaces)
     //init hdrTex and hdr cubemap
     , hdrTextureMap(hdrSamplePath)
     , hdrCubeMap(RENDER_HDR_CUBE_MAP)
@@ -359,7 +360,7 @@ void Application::update() {
 
                 // pass in env map
                 glBindVertexArray(mesh.getVao());
-                skyboxTexture.bind(GL_TEXTURE20);
+                selectedSkybox->bind(GL_TEXTURE20);
                 glDrawArrays(GL_TRIANGLES, 0, 36);
                 glUniform1i(m_selShader->getUniformLocation("SkyBox"), 20);
                 glUniform1i(m_selShader->getUniformLocation("useEnvMap"), envMapEnabled);
@@ -445,7 +446,7 @@ void Application::update() {
             glm::mat4 viewModel = glm::mat4(glm::mat3(view));
 
             glDepthFunc(GL_LEQUAL);
-            if (hdrMapEnabled) {
+            if (hdrMapEnabled && !showSolarSystem) {
                 m_hdrSkyBoxShader.bind();
                 glUniformMatrix4fv(m_hdrSkyBoxShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(viewModel));
                 glUniformMatrix4fv(m_hdrSkyBoxShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
@@ -464,7 +465,7 @@ void Application::update() {
                 glUniformMatrix4fv(m_skyBoxShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
                 glBindVertexArray(skyboxVAO);
-                skyboxTexture.bind(GL_TEXTURE0);
+                selectedSkybox->bind(GL_TEXTURE0);
 
                 glUniform1i(m_skyBoxShader.getUniformLocation("skybox"), 0);
                 glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -501,6 +502,8 @@ void Application::update() {
 
 void Application::generateSkyBox()
 {
+    selectedSkybox = &skyboxTexture;
+
     // === Create SkyBox Vertices ===
 
     glEnable(GL_DEPTH_TEST);
@@ -781,6 +784,9 @@ void Application::imgui() {
     ImGui::Separator();
     ImGui::Text("Miscellaneous");
     ImGui::Checkbox("Show Solar System", &showSolarSystem);
+
+    if (showSolarSystem) { selectedSkybox = &celestialSkyboxTexture; }
+    else { selectedSkybox = &skyboxTexture; }
 
     ImGui::Separator();
     ImGui::Text("Lights");
@@ -1080,9 +1086,6 @@ void Application::renderSolarSystem() {
     const glm::vec3 cameraPos = trackball.position();
     const glm::mat4 view = trackball.viewMatrix();
     const glm::mat4 projection = trackball.projectionMatrix();
-
-    const glm::mat4 lightViewMatrix = glm::lookAt(selectedLight->position, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    const glm::mat4 lightMVP = projection * lightViewMatrix;
     
     for (size_t i = 0; i < celestialBodies.size(); ++i)
     {
@@ -1100,6 +1103,9 @@ void Application::renderSolarSystem() {
         const glm::mat4 newMatrix = body.getMatrix();
         const glm::mat4 mvpMatrix = projection * view * newMatrix;
         const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(newMatrix));
+
+        const glm::mat4 lightViewMatrix = glm::lookAt(glm::vec3(0.0f), glm::vec3(orbitOrigin[3]), glm::vec3(0.0f, 1.0f, 0.0f));
+        const glm::mat4 lightMVP = projection * lightViewMatrix;
         
         for (GPUMesh& mesh : m_meshes) {
             GLuint newUBOMaterial;
@@ -1123,12 +1129,29 @@ void Application::renderSolarSystem() {
 
             m_shadowTex.bind(GL_TEXTURE1);
             glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
+            glUniform1i(m_selShader->getUniformLocation("useEnvMap"), GL_FALSE);
 
-            Texture* bodyTexture = findCelestialTexture(body.getTexturePath());
+            Texture* bodyTexture = findCelestialTexture(body.getTexturePath() + ".jpg");
             if (bodyTexture != NULL)
             {
                 bool hasTexCoords = mesh.hasTextureCoords();
                 bodyTexture->bind(hasTexCoords ? GL_TEXTURE0 : 0);
+            }
+
+            if (useNormalMapping) {
+                Texture* normalTexture = findCelestialTexture(body.getTexturePath() + "_normal.png");
+                if (normalTexture != NULL)
+                {
+                    glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_TRUE);
+                    normalTexture->bind(GL_TEXTURE3);
+                    glUniform1i(m_selShader->getUniformLocation("normalTex"), 3);
+                }
+                else
+                {
+                    glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_FALSE);
+                }
+            } else {
+                glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_FALSE);
             }
 
             if (usePbrShading) {
@@ -1152,7 +1175,8 @@ void Application::initCelestialTextures()
         std::string path = body.getTexturePath();
         try
         {
-            celestialTextures[path] = Texture(std::string(RESOURCE_ROOT) + path);
+            celestialTextures[path + ".jpg"] = Texture(std::string(RESOURCE_ROOT) + path + ".jpg");
+            celestialTextures[path + "_normal.png"] = Texture(std::string(RESOURCE_ROOT) + path + "_normal.png");
         }
         catch (textureLoadingException e)
         {
