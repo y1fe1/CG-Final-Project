@@ -7,8 +7,6 @@ Application::Application()
     , texturePath("resources/texture/brickwall.jpg")
     // , texturePath("resources/celestial_bodies/moon.jpg")
     , m_texture(RESOURCE_ROOT "resources/texture/checkerboard.png")
-    , m_texture_sun(RESOURCE_ROOT "resources/celestial_bodies/sun.jpg")
-    , m_texture_moon(RESOURCE_ROOT "resources/celestial_bodies/moon.jpg")
     , m_projectionMatrix(glm::perspective(glm::radians(80.0f), m_window.getAspectRatio(), 0.1f, 30.0f))
     , m_viewMatrix(glm::lookAt(glm::vec3(-1, 1, -1), glm::vec3(0), glm::vec3(0, 1, 0)))
     , m_modelMatrix(1.0f)
@@ -50,6 +48,8 @@ Application::Application()
     m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/metallic.png")));
     m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/roughness.png")));
     m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/ao.png")));
+
+    initCelestialTextures();
 
     //lights.push_back(
     //    { glm::vec3(2, 1, 2), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
@@ -1077,18 +1077,6 @@ void Application::renderSolarSystem() {
     GLint previousVBO;
     glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &previousVBO);
 
-    // std::string path = "resources/celestial_bodies/moon.jpg";
-    // std::string path = std::string(RESOURCE_ROOT) + "resources/celestial_bodies/moon.jpg";
-    // if (std::filesystem::exists(path))
-    // {
-    //     std::shared_ptr texPtr = std::make_shared<Image>(path);
-        
-    //     for (Mesh& mesh : bodies)
-    //     {
-    //         mesh.material.kdTexture = texPtr;
-    //     }
-    // }
-
     const glm::vec3 cameraPos = trackball.position();
     const glm::mat4 view = trackball.viewMatrix();
     const glm::mat4 projection = trackball.projectionMatrix();
@@ -1136,8 +1124,12 @@ void Application::renderSolarSystem() {
             m_shadowTex.bind(GL_TEXTURE1);
             glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
 
-            bool hasTexCoords = mesh.hasTextureCoords();
-            m_texture.bind(hasTexCoords ? GL_TEXTURE0 : 0);
+            Texture* bodyTexture = findCelestialTexture(body.getTexturePath());
+            if (bodyTexture != NULL)
+            {
+                bool hasTexCoords = mesh.hasTextureCoords();
+                bodyTexture->bind(hasTexCoords ? GL_TEXTURE0 : 0);
+            }
 
             if (usePbrShading) {
                 mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
@@ -1151,6 +1143,31 @@ void Application::renderSolarSystem() {
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, previousVBO);
+}
+
+void Application::initCelestialTextures()
+{
+    for (auto& body : celestialBodies)
+    {
+        std::string path = body.getTexturePath();
+        try
+        {
+            celestialTextures[path] = Texture(std::string(RESOURCE_ROOT) + path);
+        }
+        catch (textureLoadingException e)
+        {
+            std::cerr << e.what() << std::endl;
+        }
+    }
+}
+
+Texture* Application::findCelestialTexture(std::string celestialTexturePath)
+{
+    if (celestialTextures.find(celestialTexturePath) != celestialTextures.end())
+    {
+        return &celestialTextures[celestialTexturePath];
+    }
+    return NULL;
 }
 
 void Application::updateFrameNumber()

@@ -24,6 +24,7 @@ DISABLE_WARNINGS_POP()
 #include <array>
 #include <iostream>
 #include <vector>
+#include <map>
 
 inline const int WIDTH = 1920;
 inline const int HEIGHT = 1080;

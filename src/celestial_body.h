@@ -13,11 +13,14 @@ private:
     float yFactor = 0.0f;
     bool stationary = false;
 
+    std::string texturePath;
+
 public:
     CelestialBody() {}
 
     glm::mat4 getMatrix() { return matrix; }
     float getOrbitRadius() { return orbitRadius; }
+    std::string getTexturePath() { return texturePath; }
 
     void updateBodyPosition(uint frame, glm::mat4& orbitOriginMatrix, float orbitR)
     {
@@ -44,6 +47,7 @@ public:
     static CelestialBody Sun()
     {
         CelestialBody body{};
+        body.texturePath = "resources/celestial_bodies/sun.jpg";
         body.orbitRadius = 7.5f;
         body.radius = 2.5f;
         body.stationary = true;
@@ -53,6 +57,7 @@ public:
     static CelestialBody Earth()
     {
         CelestialBody body{};
+        body.texturePath = "resources/celestial_bodies/earth.jpg";
         body.orbitRadius = 1.4f;
         body.speed = 0.001f;
         body.radius = 1.0f;
@@ -63,6 +68,7 @@ public:
     static CelestialBody Moon()
     {
         CelestialBody body{};
+        body.texturePath = "resources/celestial_bodies/moon.jpg";
         body.speed = 0.003f;
         body.radius = 0.3f;
         body.yFactor = 0.7f;

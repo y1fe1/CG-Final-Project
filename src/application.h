@@ -89,10 +89,7 @@ private:
 
     // Definition for model Obejcts includeing texture and Material
     std::vector<GPUMesh> m_meshes;
-    std::vector<GPUMesh> m_meshes_celestial;
     Texture m_texture;
-    Texture m_texture_sun;
-    Texture m_texture_moon;
 
     char file_path_buffer[256];
     std::string texturePath;
@@ -161,6 +158,9 @@ private:
     bool showSolarSystem = false;
     uint frame = 0;
     std::array<CelestialBody, 3> celestialBodies;
+    std::map<std::string, Texture> celestialTextures;
+    void initCelestialTextures();
+    Texture* findCelestialTexture(std::string celestialTexturePath);
     void updateFrameNumber();
     void renderSolarSystem();
 

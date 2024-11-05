@@ -74,6 +74,8 @@ Texture::Texture(Texture&& other) noexcept
     : abstractTexture(std::move(other))
 {}
 
+Texture::Texture() {}
+
 Texture::~Texture()
 {
     if (m_texture != INVALID)
