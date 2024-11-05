@@ -8,6 +8,8 @@
 #include "Textures/hdrTexture.h"
 #include "Textures/ssaoBufferTexture.h"
 
+#include "celestial_body.h"
+
 #define MAX_LIGHT_CNT 10
 #include "minimap.h"
 #include <stb/stb_image.h>
@@ -38,6 +40,8 @@ private:
     Shader m_pointShader;
     Shader m_postProcessShader;
 
+    // Shader m_celestialBodyShader;
+
     // Definition for SkyBox 
     bool envMapEnabled = false;
 
@@ -51,7 +55,18 @@ private:
         std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "back.jpg")
     };
 
+    std::vector<std::filesystem::path> celestialFaces = {
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "deep_sky/right.png"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "deep_sky/left.png"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "deep_sky/top.png"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "deep_sky/bottom.png"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "deep_sky/front.png"),
+        std::filesystem::path(RESOURCE_ROOT SKYBOX_PATH "deep_sky/back.png")
+    };
+
+    cubeMapTex* selectedSkybox;
     cubeMapTex skyboxTexture;
+    cubeMapTex celestialSkyboxTexture;
     GLuint skyboxVAO,skyboxVBO;
 
     Shader m_skyBoxShader;
@@ -124,7 +139,7 @@ private:
 
     std::vector<Texture> m_pbrTextures;
 
-    bool textureEnabled = false;
+    bool textureEnabled = true;
 
     Material m_Material;
     PBRMaterial m_PbrMaterial;
@@ -190,6 +205,16 @@ private:
     void drawEnvMap(bool envMapEnabled, bool hdrMapEnabled);
     void drawMultiLightShader(GPUMesh& mesh, bool multiLightShadingEnabled);
 
+
+    //Hierarchical transformation
+    bool showSolarSystem = false;
+    uint frame = 0;
+    std::array<CelestialBody, 3> celestialBodies;
+    std::map<std::string, Texture> celestialTextures;
+    void initCelestialTextures();
+    Texture* findCelestialTexture(std::string celestialTexturePath);
+    void updateFrameNumber();
+    void renderSolarSystem();
 
 public:
     Application();

@@ -20,6 +20,7 @@ public:
 
     Texture(const Texture&) = delete;
     Texture(Texture&&) noexcept;
+    Texture();
     ~Texture();
 
     Texture& operator=(const Texture&) = delete;
