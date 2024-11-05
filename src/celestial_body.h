@@ -20,6 +20,7 @@ public:
     CelestialBody() {}
 
     glm::mat4 getMatrix() { return matrix; }
+    float getRadius() { return radius; }
     float getOrbitRadius() { return orbitRadius; }
     std::string getTexturePath() { return texturePath; }
 
