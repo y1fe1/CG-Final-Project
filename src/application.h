@@ -7,6 +7,8 @@
 #include "Textures/cubeMapTexture.h"
 #include "Textures/hdrTexture.h"
 
+#include "celestial_body.h"
+
 #define MAX_LIGHT_CNT 10
 #include "minimap.h"
 #include <stb/stb_image.h>
@@ -97,7 +99,7 @@ private:
 
     std::vector<Texture> m_pbrTextures;
 
-    bool textureEnabled = false;
+    bool textureEnabled = true;
 
     Material m_Material;
     PBRMaterial m_PbrMaterial;
@@ -157,22 +159,10 @@ private:
 
     //Hierarchical transformation
     bool showSolarSystem = false;
-    int frame = 0;
+    uint frame = 0;
+    std::array<CelestialBody, 3> celestialBodies;
     void updateFrameNumber();
-    glm::mat4 sunMatrix = glm::mat4(1.0f);
-    glm::mat4 earthMatrix = glm::mat4(1.0f);
-    glm::mat4 moonMatrix = glm::mat4(1.0f);
-    float sunOrbitRadius = 2.0f;
-    float earthOrbitRadius = 0.8f;
-    float earthSpeed = 0.05f;
-    float moonSpeed = 0.03f;
-    const float SUN_RADIUS = 10.0f;
-    const float EARTH_RADIUS = 2.5f;
-    const float MOON_RADIUS = 0.15f;
-    Mesh generateSphereMesh(float radius, int rings, int sectors);
-    std::vector<Mesh> generateCelestialBodies();
-    void updateBodyPosition(glm::mat4& originMatrix, float radius, glm::mat4& bodyMatrix, float speed);
-    void drawSolarSystem();
+    void renderSolarSystem();
 
 public:
     Application();
