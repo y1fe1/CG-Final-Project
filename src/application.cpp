@@ -1172,6 +1172,5 @@ Texture* Application::findCelestialTexture(std::string celestialTexturePath)
 
 void Application::updateFrameNumber()
 {
-    // frame = (frame + 1) % 360;
     ++frame;
 }
