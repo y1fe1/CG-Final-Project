@@ -181,10 +181,10 @@ Application::Application()
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/lights/light_frag.glsl");
         m_shaderSSAOBlur = ssaoBuilder.build();
         */
-        ShaderBuilder celestialBodyShader;
-        celestialBodyShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/celestial_body_vert.glsl");
-        celestialBodyShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/celestial_body_frag.glsl");
-        m_celestialBodyShader = celestialBodyShader.build();
+        // ShaderBuilder celestialBodyShader;
+        // celestialBodyShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/celestial_body_vert.glsl");
+        // celestialBodyShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/celestial_body_frag.glsl");
+        // m_celestialBodyShader = celestialBodyShader.build();
 
         initPostProcess();
         applyNormalTexture();
@@ -1415,8 +1415,6 @@ void Application::drawMultiLightShader(GPUMesh& mesh,bool multiLightShadingEnabl
 // This should only ever be ran if the selected mesh
 // is sphere.obj.
 void Application::renderSolarSystem() {
-    m_selShader = &m_celestialBodyShader;
-
     updateFrameNumber();
 
     GLint previousVBO;
@@ -1445,8 +1443,6 @@ void Application::renderSolarSystem() {
 
         const glm::mat4 lightViewMatrix = glm::lookAt(glm::vec3(0.0f), glm::vec3(orbitOrigin[3]), glm::vec3(0.0f, 1.0f, 0.0f));
         const glm::mat4 lightMVP = projection * lightViewMatrix;
-
-        float bodyRadius = body.getRadius();
         
         for (GPUMesh& mesh : m_meshes) {
             GLuint newUBOMaterial;
@@ -1463,33 +1459,37 @@ void Application::renderSolarSystem() {
             m_selShader->bind();
             
             glUniformMatrix4fv(m_selShader->getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
-            glUniform3fv(m_selShader->getUniformLocation("lightPos"), 1, glm::value_ptr(glm::vec3(orbitOrigin[3])));
+            glUniformMatrix4fv(m_selShader->getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
+            glUniformMatrix4fv(m_selShader->getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(newMatrix));
+            glUniformMatrix4fv(m_selShader->getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
             glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
-            glUniform1f(m_selShader->getUniformLocation("innerRadius"), bodyRadius);
-            glUniform1f(m_selShader->getUniformLocation("outerRadius"), bodyRadius * 1.1f);
 
-            // Texture* bodyTexture = findCelestialTexture(body.getTexturePath() + ".jpg");
-            // if (bodyTexture != NULL)
-            // {
-            //     bool hasTexCoords = mesh.hasTextureCoords();
-            //     bodyTexture->bind(hasTexCoords ? GL_TEXTURE0 : 0);
-            // }
+            m_shadowTex.bind(GL_TEXTURE1);
+            glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
+            glUniform1i(m_selShader->getUniformLocation("useEnvMap"), GL_FALSE);
 
-            // if (useNormalMapping) {
-            //     Texture* normalTexture = findCelestialTexture(body.getTexturePath() + "_normal.png");
-            //     if (normalTexture != NULL)
-            //     {
-            //         glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_TRUE);
-            //         normalTexture->bind(GL_TEXTURE3);
-            //         glUniform1i(m_selShader->getUniformLocation("normalTex"), 3);
-            //     }
-            //     else
-            //     {
-            //         glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_FALSE);
-            //     }
-            // } else {
-            //     glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_FALSE);
-            // }
+            Texture* bodyTexture = findCelestialTexture(body.getTexturePath() + ".jpg");
+            if (bodyTexture != NULL)
+            {
+                bool hasTexCoords = mesh.hasTextureCoords();
+                bodyTexture->bind(hasTexCoords ? GL_TEXTURE0 : 0);
+            }
+
+            if (useNormalMapping) {
+                Texture* normalTexture = findCelestialTexture(body.getTexturePath() + "_normal.png");
+                if (normalTexture != NULL)
+                {
+                    glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_TRUE);
+                    normalTexture->bind(GL_TEXTURE3);
+                    glUniform1i(m_selShader->getUniformLocation("normalTex"), 3);
+                }
+                else
+                {
+                    glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_FALSE);
+                }
+            } else {
+                glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_FALSE);
+            }
 
             if (usePbrShading) {
                 mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
@@ -1504,98 +1504,6 @@ void Application::renderSolarSystem() {
 
     glBindBuffer(GL_ARRAY_BUFFER, previousVBO);
 }
-// void Application::renderSolarSystem() {
-//     m_selShader = &m_celestialBodyShader;
-
-//     updateFrameNumber();
-
-//     GLint previousVBO;
-//     glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &previousVBO);
-
-//     const glm::vec3 cameraPos = trackball.position();
-//     const glm::mat4 view = m_viewMatrix;
-//     const glm::mat4 projection = m_projectionMatrix;
-    
-//     for (size_t i = 0; i < celestialBodies.size(); ++i)
-//     {
-//         CelestialBody& body = celestialBodies[i];
-
-//         glm::mat4 orbitOrigin = glm::mat4(1.0f);
-//         float orbitRadius = 0.0f;
-//         if (i >= 1)
-//         {
-//             orbitOrigin = celestialBodies[i - 1].getMatrix();
-//             orbitRadius = celestialBodies[i - 1].getOrbitRadius();
-//         }
-
-//         body.updateBodyPosition(frame, orbitOrigin, orbitRadius);
-//         const glm::mat4 newMatrix = body.getMatrix();
-//         const glm::mat4 mvpMatrix = projection * view * newMatrix;
-//         const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(newMatrix));
-
-//         const glm::mat4 lightViewMatrix = glm::lookAt(glm::vec3(0.0f), glm::vec3(orbitOrigin[3]), glm::vec3(0.0f, 1.0f, 0.0f));
-//         const glm::mat4 lightMVP = projection * lightViewMatrix;
-        
-//         for (GPUMesh& mesh : m_meshes) {
-//             GLuint newUBOMaterial;
-//             GPUMaterial gpuMat = GPUMaterial(m_Material);
-//             genUboBufferObj(gpuMat, newUBOMaterial);
-//             mesh.setUBOMaterial(newUBOMaterial);
-
-//             // generate UBO for shadowSetting
-//             GLuint shadowSettingUbo;
-//             genUboBufferObj(shadowSettings, shadowSettingUbo);
-
-//             glBindVertexArray(mesh.getVao());
-
-//             m_selShader->bind();
-            
-//             glUniformMatrix4fv(m_selShader->getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
-//             glUniformMatrix4fv(m_selShader->getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
-//             glUniformMatrix4fv(m_selShader->getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(newMatrix));
-//             glUniformMatrix4fv(m_selShader->getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
-//             glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
-
-//             m_shadowTex.bind(GL_TEXTURE1);
-//             glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
-//             glUniform1i(m_selShader->getUniformLocation("useEnvMap"), GL_FALSE);
-
-//             Texture* bodyTexture = findCelestialTexture(body.getTexturePath() + ".jpg");
-//             if (bodyTexture != NULL)
-//             {
-//                 bool hasTexCoords = mesh.hasTextureCoords();
-//                 bodyTexture->bind(hasTexCoords ? GL_TEXTURE0 : 0);
-//             }
-
-//             if (useNormalMapping) {
-//                 Texture* normalTexture = findCelestialTexture(body.getTexturePath() + "_normal.png");
-//                 if (normalTexture != NULL)
-//                 {
-//                     glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_TRUE);
-//                     normalTexture->bind(GL_TEXTURE3);
-//                     glUniform1i(m_selShader->getUniformLocation("normalTex"), 3);
-//                 }
-//                 else
-//                 {
-//                     glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_FALSE);
-//                 }
-//             } else {
-//                 glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_FALSE);
-//             }
-
-//             if (usePbrShading) {
-//                 mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
-//             }
-//             else {
-//                 mesh.draw(*m_selShader);
-//             }
-
-//             glBindVertexArray(0);
-//         }
-//     }
-
-//     glBindBuffer(GL_ARRAY_BUFFER, previousVBO);
-// }
 
 void Application::initCelestialTextures()
 {

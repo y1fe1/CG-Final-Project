@@ -40,7 +40,7 @@ private:
     Shader m_pointShader;
     Shader m_postProcessShader;
 
-    Shader m_celestialBodyShader;
+    // Shader m_celestialBodyShader;
 
     // Definition for SkyBox 
     bool envMapEnabled = false;
