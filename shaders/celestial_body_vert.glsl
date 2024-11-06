@@ -14,7 +14,7 @@ const float MIE                 = 1.0;  // Km
 const float SCALE_DEPTH         = 1.0;  // fScaleDepth???
 
 const float PI                  = 3.14159265359;
-const uint SAMPLES              = 100;
+const int SAMPLES               = 1;
 
 const float RAYLEIGH_PI_4       = RAYLEIGH * PI * 4.0;
 const float MIE_PI_4            = MIE * PI * 4.0;
@@ -46,10 +46,10 @@ void calculateAtmosphere()
 {
     vec3 ray = position - viewPos;
     float rayFar = length(ray);
-    ray /= rayFar;
+    ray = ray / min(0.01, rayFar);
 
-    camHeightSq = viewPos.y * viewPos.y;
-    outerRadiusSq = outerRadius * outerRadius;
+    float camHeightSq = viewPos.y * viewPos.y;
+    float outerRadiusSq = outerRadius * outerRadius;
     
     float rayNear = nearestIntersection(viewPos, ray, camHeightSq, outerRadiusSq);
     rayFar -= rayNear;
@@ -57,11 +57,11 @@ void calculateAtmosphere()
     float scale = 1.0 / (outerRadius - innerRadius);
 
     vec3 start = viewPos + ray * rayNear;
-    float startAngle = dot(ray, start) / outerRadius;
+    float startAngle = dot(ray, start) / min(0.01, outerRadius);
     float startDepth = exp(-1.0 / SCALE_DEPTH);
     float startOffset = startDepth * expScale(startAngle);
 
-    float sampleLength = rayFar / ((float)SAMPLES);
+    float sampleLength = rayFar / float(SAMPLES);
     float scaledLength = sampleLength * scale;
     vec3 sampleRay = ray * sampleLength;
     vec3 samplePoint = start + sampleRay * 0.5;
@@ -71,13 +71,13 @@ void calculateAtmosphere()
 
     vec3 frontColor = vec3(0.0, 0.0, 0.0);
 
-    for (int i = 0; i < SAMPLES; ++i)
+    for (int i = 0; i < SAMPLES; i++)
     {
         float height = length(samplePoint);
         float depth = exp(scaleOverDepth * (innerRadius - height));
 
-        float lightAngle = dot(lightDir, samplePoint) / height;
-        float cameraAngle = dot(ray, samplePoint) / height;
+        float lightAngle = dot(lightDir, samplePoint) / min(0.01, height);
+        float cameraAngle = dot(ray, samplePoint) / min(0.01, height);
         float scatter = startOffset + depth * (expScape(lightAngle) - expScape(cameraAngle));
 
         float attenuate = exp(-scatter * (inverseWavelength * RAYLEIGH_PI_4 + MIE_PI_4));
