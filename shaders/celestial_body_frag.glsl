@@ -4,7 +4,7 @@ const float G1 = 0.75;   // ???
 const float G2 = 0.8;   // ???
 
 in vec3 lightDir;
-in vec3 FragPos;
+in vec4 FragPos;
 in vec3 c0;
 in vec3 c1;
 in vec3 t0;

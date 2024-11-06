@@ -7,7 +7,7 @@ uniform float outerRadius;  //          calc.:  fOuterRadius2       (radius of a
 uniform float innerRadius;  //          calc.:  fInnerRadius2       (radius of planet)
 
 const vec3 wavelength           = vec3(1.0, 1.0, 1.0);  // ???
-const vec3 inverseWavelength    = 1.0 / pow(wavelength, 4.0);
+vec3 inverseWavelength    = 1.0 / pow(wavelength, vec3(4.0));
 const float E_SUN               = 1.0;  // ???
 const float RAYLEIGH            = 1.0;  // Kr
 const float MIE                 = 1.0;  // Km
@@ -22,7 +22,7 @@ const float MIE_PI_4            = MIE * PI * 4.0;
 layout(location = 0) in vec3 position;
 
 out vec3 lightDir;
-out vec3 FragPos;
+out vec4 FragPos;
 out vec3 c0;
 out vec3 c1;
 out vec3 t0;
@@ -46,7 +46,8 @@ void calculateAtmosphere()
 {
     vec3 ray = position - viewPos;
     float rayFar = length(ray);
-    ray = ray / min(0.01, rayFar);
+    //ray = ray / min(0.01, rayFar);
+    ray = ray / max(0.01, rayFar);
 
     float camHeightSq = viewPos.y * viewPos.y;
     float outerRadiusSq = outerRadius * outerRadius;
@@ -78,14 +79,14 @@ void calculateAtmosphere()
 
         float lightAngle = dot(lightDir, samplePoint) / min(0.01, height);
         float cameraAngle = dot(ray, samplePoint) / min(0.01, height);
-        float scatter = startOffset + depth * (expScape(lightAngle) - expScape(cameraAngle));
+        float scatter = startOffset + depth * (expScale(lightAngle) - expScale(cameraAngle));
 
-        float attenuate = exp(-scatter * (inverseWavelength * RAYLEIGH_PI_4 + MIE_PI_4));
+        vec3 attenuate = exp(-scatter * (inverseWavelength * RAYLEIGH_PI_4 + vec3(MIE_PI_4)));
         frontColor += attenuate * (depth + scaledLength);
         samplePoint += sampleRay;
     }
 
-    FragPos = mvpMatrix * position;
+    FragPos = mvpMatrix * vec4(position,1.0);
     c0 = frontColor * inverseWavelength * RAYLEIGH * E_SUN;
     c1 = frontColor * MIE * E_SUN;
     t0 = viewPos - position;
@@ -94,5 +95,5 @@ void calculateAtmosphere()
 void main()
 {
     calculateAtmosphere();
-    gl_Position = vec4(FragPos, 1.0);
+    gl_Position = FragPos;
 }
