@@ -43,8 +43,6 @@ Application::Application()
     , celestialBodies { CelestialBody::Sun(), CelestialBody::Earth(), CelestialBody::Moon() }
     , sun_light { }
 {
-    //Camera defaultCamera = Camera(&m_window);
-
     // lights must be initialized here since light is still struct not class
     lights.push_back(
         { glm::vec3(1, 3, -2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
@@ -55,14 +53,6 @@ Application::Application()
     );
 
     initCelestialTextures();
-
-    //lights.push_back(
-    //    { glm::vec3(2, 1, 2), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
-    //);
-    
-    //lights.push_back(
-    //    { glm::vec3(1,1, 3), glm::vec3(2), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
-    //);
 
     // init normal material
     m_Material.kd = glm::vec3{ 0.5f, 0.5f, 1.0f };
@@ -76,8 +66,6 @@ Application::Application()
     glm::vec3 rotations = { 0.2, 0.0, 0.0 };
 
     float dist = 1.0;
-    //trackball.setCamera(look_at, rotations, dist);
-
 
     m_window.registerKeyCallback([this](int key, int scancode, int action, int mods) {
         if (action == GLFW_PRESS)
@@ -92,20 +80,17 @@ Application::Application()
             onMouseClicked(button, mods);
         else if (action == GLFW_RELEASE)
             onMouseReleased(button, mods);
-        });
+    });
 
     // generate env maps
     initPBRTexures();
-
     generateSkyBox();
-
     generateHdrMap();
 
     // then before rendering, configure the viewport to the original framebuffer's screen dimensions
     glm::ivec2 windowSizes = m_window.getWindowSize();
     glViewport(0, 0, windowSizes.x, windowSizes.y);
 
-    //m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/sphere.obj");
     initMaterialTexture();
 
     // ===  Create All Shader ===
@@ -182,10 +167,6 @@ Application::Application()
             .addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/lights/light_frag.glsl");
         m_shaderSSAOBlur = ssaoBuilder.build();
         */
-        // ShaderBuilder celestialBodyShader;
-        // celestialBodyShader.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/celestial_body_vert.glsl");
-        // celestialBodyShader.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/celestial_body_frag.glsl");
-        // m_celestialBodyShader = celestialBodyShader.build();
 
         initPostProcess();
         applyNormalTexture();
@@ -208,8 +189,8 @@ void Application::applyNormalTexture()
 {
     // Normal texture image
     int width, height, sourceNumChannels;
-    // stbi_uc* pixels = stbi_load(RESOURCE_ROOT "resources/normal_mapping/checkerboard_normal.png", &width, &height, &sourceNumChannels, STBI_rgb);
-    stbi_uc* pixels = stbi_load(RESOURCE_ROOT "resources/normal_mapping/brickwall_normal.png", &width, &height, &sourceNumChannels, STBI_rgb);
+    stbi_uc* pixels = stbi_load(RESOURCE_ROOT "resources/normal_mapping/checkerboard_normal.png", &width, &height, &sourceNumChannels, STBI_rgb);
+    // stbi_uc* pixels = stbi_load(RESOURCE_ROOT "resources/normal_mapping/brickwall_normal.png", &width, &height, &sourceNumChannels, STBI_rgb);
 
     // Normal texture
     glGenTextures(1, &normalTex);
@@ -221,9 +202,7 @@ void Application::applyNormalTexture()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels);
-    // glGenerateMipmap(GL_TEXTURE_2D);
 
-    // Free the CPU memory after we copied the image to the GPU.
     stbi_image_free(pixels);
 }
 
@@ -231,12 +210,6 @@ void Application::update() {
     while (!m_window.shouldClose()) {
         m_window.updateInput();
         windowSizes = m_window.getWindowSize(); 
-
-        //GLint viewport[4];
-        //glGetIntegerv(GL_VIEWPORT, viewport);
-        //std::cout << "Current viewport: x = " << viewport[0] << ", y = " << viewport[1]
-        //    << ", width = " << viewport[2] << ", height = " << viewport[3] << std::endl;
-        //std::cout << "Window viewport: x = " << windowSizes[0] << ", y = " << windowSizes[1] << "." << std::endl;
 
         m_materialChangedByUser = false;
 
@@ -247,18 +220,10 @@ void Application::update() {
         if (usePostProcess) {
             // 绑定自定义的帧缓冲对象
             glBindFramebuffer(GL_FRAMEBUFFER, framebufferPostProcess);
-            // glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-            //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-            // GLint currentFramebuffer;
-            // glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFramebuffer);
-            //  std::cout << "IN ENTRY, Current Framebuffer ID: " << currentFramebuffer << std::endl;
-
         }
         else {
             // 绑定默认帧缓冲对象（屏幕）
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            //glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
         }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -268,56 +233,32 @@ void Application::update() {
         glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
 
-
-        //START Debug Trackball
-        //const glm::vec3 cameraPos = trackball.position();
+        // Camera, trackball and orientation matrices
         const glm::vec3 cameraPos = selectedCamera->cameraPos();
         const glm::mat4 model{ 1.0f };
 
-        // const glm::mat4 view = m_viewMatrix;
-        // const glm::mat4 projection = m_projectionMatrix;
         const glm::mat4 view = trackball.viewMatrix();
         const glm::mat4 projection = trackball.projectionMatrix();
 
-        //glm::mat4 lightMVP;
-        //GLfloat near_plane = 0.5f, far_plane = 30.0f;
-        //glm::mat4 mainProjectionMatrix = m_projectionMatrix;//glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
-        //glm::mat4 lightViewMatrix = glm::lookAt(selectedLight->position, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        //lightMVP = mainProjectionMatrix * lightViewMatrix;
-
         const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
-
-        //COMMENT START
-        //const glm::vec3 cameraPos = trackball.position();
-        ////const glm::vec3 cameraPos = selectedCamera->cameraPos();
-        //const glm::mat4 model{ 1.0f };
-
-        ////const glm::mat4 view = m_viewMatrix;
-        //const glm::mat4 view = trackball.viewMatrix();
-        //const glm::mat4 projection = trackball.projectionMatrix();
-
-        //glm::mat4 lightMVP;
-        //GLfloat near_plane = 0.5f, far_plane = 30.0f;
-        //glm::mat4 mainProjectionMatrix = m_projectionMatrix;//glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
-        ////COMMENT END
 
         glm::mat4 lightViewMatrix = glm::lookAt(selectedLight->position, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 lightMVP = m_projectionMatrix * lightViewMatrix;
-        //glm::mat4 mvpMatrix = projection * view * model;
-        //FINISH
         
-
-        //const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
         const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(m_modelMatrix));
 
+        // Either render the (simplified) solar system, or another scene.
         if (showSolarSystem)
         {
+            // Render the solar system
             renderSolarSystem();
         }
         
         if (!showSolarSystem) {
-            // Actualy Mesh Render Loop
+            // Render the other scene
+
             #pragma region Mesh render loop
+            // Mesh render loop
             for (GPUMesh& mesh : m_meshes) {
 
                 //shadow maps generates the shadows
@@ -585,17 +526,11 @@ void Application::update() {
 
         if (usePostProcess) {
             // 绑定默认帧缓冲对象，将结果绘制到屏幕
-            // GLint currentFramebuffer;
-            // glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFramebuffer);
-            // std::cout << "IN usePostProcess, Current Framebuffer ID: " << currentFramebuffer << std::endl;
-
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             runPostProcess();
             glFinish();
         }
-        // std::cout << "Viewport: " << viewport[0] << ", " << viewport[1] << ", " << viewport[2] << ", " << viewport[3] << "\n";
-			
-        
+
         /*glDisable(GL_DEPTH_TEST);
         m_brdfShader.bind();
         renderQuad(quadVAO,quadVBO,quadVertices,20);
@@ -604,12 +539,19 @@ void Application::update() {
         m_window.swapBuffers();
     }
 
-    // if (useNormalMapping) {
-    // Clean up normal mapping texture
     glDeleteTextures(1, &normalTex);
-    // }
 }
 
+
+
+
+
+// ==== Below are helper functions that are used during the update loop ==== //
+
+
+/**
+ * Generates a VAO and VBO for a skybox.
+ */
 void Application::generateSkyBox()
 {
     selectedSkybox = &skyboxTexture;
@@ -638,6 +580,9 @@ void Application::generateSkyBox()
     }
 }
 
+/**
+ * Initializes the HDR map parameters and images.
+ */
 void Application::generateHdrMap()
 {
     // === Create HDR FrameBuffer ===
@@ -791,7 +736,9 @@ void Application::generateHdrMap()
     }
 }
 
-// generate deferred rendering buffer before the pipeline begin, this should be only excuted once
+/**
+ * generate deferred rendering buffer before the pipeline begin, this should be only excuted once
+ */
 void Application::genDeferredRenderBuffer(bool& defRenderBufferGenerated)
 {
     // deferred rendering pipeline generation
@@ -913,6 +860,9 @@ void Application::genSSAOFrameBuffer()
     ssaoNoiseTex = std::move(ssaoBufferTex(SSAO_NOISE_TEX, ssaoNoise));
 }
 
+/**
+ * ImGui menu.
+ */
 void Application::imgui() {
     ImGui::Begin("Assignment 2 Demo");
 
@@ -1084,6 +1034,7 @@ void Application::imgui() {
     ImGui::End();
 }
 
+// === Register input === //
 void Application::onKeyPressed(int key, int mods) {
     std::cout << "Key pressed: " << key << std::endl;
 }
@@ -1104,6 +1055,13 @@ void Application::onMouseReleased(int button, int mods) {
     std::cout << "Released mouse button: " << button << std::endl;
 }
 
+/**
+ * Renders all meshes in the minimap, given a model matrix.
+ * This should be called for each item that is to be rendered.
+ * It does render all loaded meshes, so this works best if
+ * there is only a single mesh (e.g. one sphere) that is rendered
+ * multiple times in different ways.
+ */
 void Application::renderMiniMapItem(glm::mat4 modelMatrix)
 {
     GLint previousVBO;
@@ -1115,13 +1073,12 @@ void Application::renderMiniMapItem(glm::mat4 modelMatrix)
     // 使用小地图的视图矩阵和投影矩阵渲染场景
     m_selShader->bind();
     const glm::mat4 mvpMatrix = minimap.projectionMatrix() * minimap.viewMatrix() * modelMatrix;
-    // const glm::vec3 newPos = glm::vec3(newMatrix[3]);
     const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(modelMatrix));
     glUniformMatrix4fv(m_selShader->getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
     glUniformMatrix4fv(m_selShader->getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
     glUniformMatrix4fv(m_selShader->getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
-    // glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(minimap.cameraPos()));
-    glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(glm::vec3(0.0f, 80.0f, 0.0f)));
+    glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(minimap.cameraPos()));
+    // glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(glm::vec3(0.0f, 80.0f, 0.0f)));
 
     // 渲染小地图内容
     for (GPUMesh& mesh : m_meshes) {
@@ -1139,6 +1096,9 @@ void Application::renderMiniMapItem(glm::mat4 modelMatrix)
     glBindBuffer(GL_ARRAY_BUFFER, previousVBO);
 }
 
+/**
+ * Renders the minimap borders and "player camera" location.
+ */
 void Application::renderMiniMap() {
     GLint previousVBO;
     glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &previousVBO);
@@ -1160,7 +1120,9 @@ void Application::renderMiniMap() {
     glBindBuffer(GL_ARRAY_BUFFER, previousVBO);
 }
 
-
+/**
+ * Renders the minimap border.
+ */
 void Application::drawMiniMapBorder() {
     // Disable Depth Test to make sure our Border will not be covered
     glDisable(GL_DEPTH_TEST);
@@ -1211,6 +1173,9 @@ void Application::drawMiniMapBorder() {
     glEnable(GL_DEPTH_TEST);
 }
 
+/**
+ * Renders the position of the "player camera" on the minimap as a block.
+ */
 void Application::drawCameraPositionOnMinimap(const glm::vec4& cameraPosInMinimap) {
     glDisable(GL_DEPTH_TEST); // Make sure our dot will not be covered
 
@@ -1250,7 +1215,9 @@ void Application::drawCameraPositionOnMinimap(const glm::vec4& cameraPosInMinima
     glEnable(GL_DEPTH_TEST);
 }
 
-// 在构造函数中
+/**
+ * Initializes the post-processing settings.
+ */
 void Application::initPostProcess() {
     // 创建帧缓冲对象
     glGenFramebuffers(1, &framebufferPostProcess);
@@ -1282,7 +1249,9 @@ void Application::initPostProcess() {
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-
+/**
+ * Runs the post-processing pipeline.
+ */
 void Application::runPostProcess() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -1307,9 +1276,10 @@ void Application::runPostProcess() {
     glEnable(GL_DEPTH_TEST);
 }
 
-
+/**
+ * Initializes some PBR textures.
+ */
 void Application::initPBRTexures() {
-
     m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/normal.png")));
     m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/albedo.png")));
     m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/metallic.png")));
@@ -1317,7 +1287,10 @@ void Application::initPBRTexures() {
     m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/ao.png")));
 }
 
-void Application::initMaterialTexture(){
+/**
+ * Initializes the main material texture.
+ */
+void Application::initMaterialTexture() {
     // === Create Material Texture if its valid path ===
     std::string textureFullPath = std::string(RESOURCE_ROOT) + texturePath;
     std::vector<Mesh> cpuMeshes = loadMesh(RESOURCE_ROOT "resources/sphere.obj"); //"resources/texture/Cerberus_by_Andrew_Maximov/Cerberus_LP.obj
@@ -1331,6 +1304,9 @@ void Application::initMaterialTexture(){
     m_meshes = GPUMesh::loadMeshGPU(cpuMeshes);  // load mesh from mesh list so we have more freedom on setting up each mesh
 }
 
+/**
+ * Draws the skybox or HDR cube map.
+ */
 void Application::drawEnvMap(bool envMapEnabled, bool hdrMapEnabled) {
     if (envMapEnabled) {
         glm::mat4 projection = m_projectionMatrix;
@@ -1367,7 +1343,9 @@ void Application::drawEnvMap(bool envMapEnabled, bool hdrMapEnabled) {
     }
 }
 
-
+/**
+ * Draws using the multi-light shader.
+ */
 void Application::drawMultiLightShader(GPUMesh& mesh,bool multiLightShadingEnabled) {
     if (multiLightShadingEnabled) {
         genUboBufferObj(lights, lightUBO, MAX_LIGHT_CNT);
@@ -1406,12 +1384,16 @@ void Application::drawMultiLightShader(GPUMesh& mesh,bool multiLightShadingEnabl
     }
 }
 
-// Renders (a part of) the solar system.
-// This should only ever be ran if the selected mesh
-// is sphere.obj.
+/**
+ * Renders a simplified the solar system.
+ * This should only ever be run if the selected mesh
+ * is sphere.obj.
+ */
 void Application::renderSolarSystem() {
     if (moveCelestialBodies || frame == 0)
     {
+        // Update the frame number.
+        // This is used for the celestial body movement.
         updateFrameNumber();
     }
 
@@ -1424,8 +1406,15 @@ void Application::renderSolarSystem() {
     const glm::mat4 view = m_viewMatrix;
     const glm::mat4 projection = m_projectionMatrix;
     
+    // Loop through each registered celestial body for rendering.
     for (size_t i = 0; i < celestialBodies.size(); ++i)
     {
+        // Each body revolves around the previous one,
+        // except for the Sun, which is stationary and
+        // only revolves around itself.
+        //
+        // We retrieve the previous body's location in space
+        // and base the current body's matrix on that.
         CelestialBody& body = celestialBodies[i];
 
         glm::mat4 orbitOrigin = glm::mat4(1.0f);
@@ -1445,6 +1434,7 @@ void Application::renderSolarSystem() {
         const glm::mat4 lightViewMatrix = glm::lookAt(glm::vec3(0.0f), glm::vec3(orbitOrigin[3]), glm::vec3(0.0f, 1.0f, 0.0f));
         const glm::mat4 lightMVP = projection * lightViewMatrix;
         
+        // Then we draw the actual mesh representing the celestial body.
         for (GPUMesh& mesh : m_meshes) {
             glBindVertexArray(mesh.getVao());
 
@@ -1454,12 +1444,10 @@ void Application::renderSolarSystem() {
             GPUMaterial gpuMat = GPUMaterial(m_Material);
             gpuMat.kd = body.kd();
             gpuMat.ks = glm::vec3(0.0f);    // No specular reflection in space
-            // gpuMat.shininess = 0.0f;
             gpuMat.shininess = 0.0f;
             genUboBufferObj(gpuMat, newUBOMaterial);
             mesh.setUBOMaterial(newUBOMaterial);
 
-            // generate UBO for shadowSetting
             GLuint shadowSettingUbo;
             genUboBufferObj(shadowSettings, shadowSettingUbo);
 
@@ -1478,6 +1466,7 @@ void Application::renderSolarSystem() {
             glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
             glUniform1i(m_selShader->getUniformLocation("useEnvMap"), GL_FALSE);
 
+            // Render planet textures.
             if (textureEnabled)
             {
                 Texture* bodyTexture = findCelestialTexture(body.getTexturePath() + ".jpg");
@@ -1491,6 +1480,7 @@ void Application::renderSolarSystem() {
                     glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), GL_FALSE);
                 }
 
+                // Also fetch the celestial body's normal map, if applicable.
                 if (useNormalMapping)
                 {
                     Texture* normalTexture = findCelestialTexture(body.getTexturePath() + "_normal.png");
@@ -1530,15 +1520,20 @@ void Application::renderSolarSystem() {
             glBindVertexArray(0);
         }
 
+        // If enabled, render each celestial body inside the minimap.
         if (render_minimap)
         {
             renderMiniMapItem(newMatrix);
         }
     }
 
+    // Restore buffer
     glBindBuffer(GL_ARRAY_BUFFER, previousVBO);
 }
 
+/**
+ * Initializes the textures and normal maps for the celestial bodies.
+ */
 void Application::initCelestialTextures()
 {
     for (auto& body : celestialBodies)
@@ -1556,6 +1551,12 @@ void Application::initCelestialTextures()
     }
 }
 
+/**
+ * Retrieves a celestial body texture (image or normal map)
+ * based on the given path.
+ * 
+ * Path should be e.g. "resources/celestial_bodies/moon".
+ */
 Texture* Application::findCelestialTexture(std::string celestialTexturePath)
 {
     if (celestialTextures.find(celestialTexturePath) != celestialTextures.end())
@@ -1565,6 +1566,9 @@ Texture* Application::findCelestialTexture(std::string celestialTexturePath)
     return NULL;
 }
 
+/**
+ * Updates the frame number.
+ */
 void Application::updateFrameNumber()
 {
     ++frame;
