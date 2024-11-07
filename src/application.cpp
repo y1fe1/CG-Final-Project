@@ -247,12 +247,12 @@ void Application::update() {
         if (usePostProcess) {
             // 绑定自定义的帧缓冲对象
             glBindFramebuffer(GL_FRAMEBUFFER, framebufferPostProcess);
-            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            // glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            GLint currentFramebuffer;
-            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFramebuffer);
-             std::cout << "IN ENTRY, Current Framebuffer ID: " << currentFramebuffer << std::endl;
+            // GLint currentFramebuffer;
+            // glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFramebuffer);
+            //  std::cout << "IN ENTRY, Current Framebuffer ID: " << currentFramebuffer << std::endl;
 
         }
         else {
@@ -260,10 +260,9 @@ void Application::update() {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             //glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
         }
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-
         glClearDepth(1.0);
 
         glDisable(GL_CULL_FACE);
@@ -575,18 +574,18 @@ void Application::update() {
         
         GLint viewport[4];
         glGetIntegerv(GL_VIEWPORT, viewport);
-        // std::cout << "Viewport: " << viewport[0] << ", " << viewport[1] << ", " << viewport[2] << ", " << viewport[3] << "\n";
 
         if (usePostProcess) {
             // 绑定默认帧缓冲对象，将结果绘制到屏幕
-            GLint currentFramebuffer;
-            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFramebuffer);
-            std::cout << "IN usePostProcess, Current Framebuffer ID: " << currentFramebuffer << std::endl;
+            // GLint currentFramebuffer;
+            // glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFramebuffer);
+            // std::cout << "IN usePostProcess, Current Framebuffer ID: " << currentFramebuffer << std::endl;
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             runPostProcess();
             glFinish();
         }
+        // std::cout << "Viewport: " << viewport[0] << ", " << viewport[1] << ", " << viewport[2] << ", " << viewport[3] << "\n";
 			
         
         /*glDisable(GL_DEPTH_TEST);
@@ -1259,6 +1258,7 @@ void Application::runPostProcess() {
 
     // 清除默认帧缓冲区，避免重影
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
     // 使用后期处理着色器
     m_postProcessShader.bind();
 
@@ -1269,61 +1269,12 @@ void Application::runPostProcess() {
     // 设置着色器中的采样器
     glUniform1i(m_postProcessShader.getUniformLocation("scene"), 7);
 
-    GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
     glDisable(GL_DEPTH_TEST);
-    // 渲染全屏四边形，应用后期处理效果
-    GLint currentFramebuffer;
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFramebuffer);
-    std::cout << "IN runPostProcess, Current Framebuffer ID: " << currentFramebuffer << std::endl;
 
-    renderFullScreenQuad();
+    // 渲染全屏四边形，应用后期处理效果
+    renderQuad(quadVAO, quadVBO, quadVertices, 18);
 
     glEnable(GL_DEPTH_TEST);
-    //if (depthTestEnabled) {
-    //    glEnable(GL_DEPTH_TEST);
-    //}
-    //else {
-    //    glDisable(GL_DEPTH_TEST);
-    //}
-}
-
-void Application::renderFullScreenQuad() {
-    static unsigned int quadVAO = 0;
-    static unsigned int quadVBO;
-
-    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-
-    if (quadVAO == 0) {
-        float quadVertices[] = {
-            // 位置        // 纹理坐标
-            -1.0f,  1.0f,  0.0f, 1.0f,
-            -1.0f, -1.0f,  0.0f, 0.0f,
-             1.0f, -1.0f,  1.0f, 0.0f,
-
-            -1.0f,  1.0f,  0.0f, 1.0f,
-             1.0f, -1.0f,  1.0f, 0.0f,
-             1.0f,  1.0f,  1.0f, 1.0f
-        };
-
-        // 设置 VAO 和 VBO
-        glGenVertexArrays(1, &quadVAO);
-        glGenBuffers(1, &quadVBO);
-        glBindVertexArray(quadVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW );
-
-        // 位置属性
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-
-        // 纹理坐标属性
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),  (void*)(2 * sizeof(float)));
-    }
-
-    glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
 }
 
 

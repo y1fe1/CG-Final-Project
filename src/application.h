@@ -191,7 +191,6 @@ private:
     bool usePostProcess = false;
     void initPostProcess();
     void runPostProcess();
-    void renderFullScreenQuad();
     GLuint framebufferPostProcess;
     GLuint texturePostProcess;
     GLuint depthbufferPostProcess;
