@@ -45,7 +45,7 @@ public:
         {
             // Rotation around the body's own axis
             glm::vec3 rotationAxis = glm::vec3(0.15, -1, -0.15);
-            newMatrix = glm::rotate(newMatrix, angle * 36, rotationAxis);
+            newMatrix = glm::rotate(newMatrix, angle * 4, rotationAxis);
         }
 
         matrix = newMatrix;

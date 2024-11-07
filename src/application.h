@@ -215,6 +215,7 @@ private:
     Texture* findCelestialTexture(std::string celestialTexturePath);
     void updateFrameNumber();
     void renderSolarSystem();
+    Light sun_light;
 
 public:
     Application();

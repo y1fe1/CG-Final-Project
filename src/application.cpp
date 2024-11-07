@@ -39,8 +39,9 @@ Application::Application()
     , ssaoNoiseTex()
     , trackball{ &m_window, glm::radians(50.0f) }
     
-    // init celestial bodies
+    // inits for hierarchical rendering
     , celestialBodies { CelestialBody::Sun(), CelestialBody::Earth(), CelestialBody::Moon() }
+    , sun_light {}
 {
     //Camera defaultCamera = Camera(&m_window);
 
@@ -905,6 +906,10 @@ void Application::imgui() {
     ImGui::Begin("Assignment 2 Demo");
 
     ImGui::Separator();
+    ImGui::Text("Hierarchical Rendering");
+    ImGui::Checkbox("Show Solar System", &showSolarSystem);
+
+    ImGui::Separator();
     ImGui::Checkbox("Switch to Deferred Rendering Pipeline", &ssaoEnabled);
 
     ImGui::Separator();
@@ -1005,10 +1010,6 @@ void Application::imgui() {
     ImGui::Separator();
     ImGui::Text("Normal mapping");
     ImGui::Checkbox("Normal Mapping Enabled", &useNormalMapping);
-
-    ImGui::Separator();
-    ImGui::Text("Miscellaneous");
-    ImGui::Checkbox("Show Solar System", &showSolarSystem);
 
     if (showSolarSystem) { selectedSkybox = &celestialSkyboxTexture; }
     else { selectedSkybox = &skyboxTexture; }
@@ -1417,6 +1418,8 @@ void Application::drawMultiLightShader(GPUMesh& mesh,bool multiLightShadingEnabl
 void Application::renderSolarSystem() {
     updateFrameNumber();
 
+    m_selShader = &m_defaultShader;
+
     GLint previousVBO;
     glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &previousVBO);
 
@@ -1438,6 +1441,7 @@ void Application::renderSolarSystem() {
 
         body.updateBodyPosition(frame, orbitOrigin, orbitRadius);
         const glm::mat4 newMatrix = body.getMatrix();
+        const glm::vec3 newPos = glm::vec3(newMatrix[3]);
         const glm::mat4 mvpMatrix = projection * view * newMatrix;
         const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(newMatrix));
 
@@ -1463,6 +1467,7 @@ void Application::renderSolarSystem() {
             glUniformMatrix4fv(m_selShader->getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(newMatrix));
             glUniformMatrix4fv(m_selShader->getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
             glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+            glUniform1i(m_selShader->getUniformLocation("useMaterial"), true);
 
             m_shadowTex.bind(GL_TEXTURE1);
             glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
@@ -1495,7 +1500,9 @@ void Application::renderSolarSystem() {
                 mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
             }
             else {
-                mesh.draw(*m_selShader);
+                sun_light.position = glm::vec3(translate(inverse(newMatrix), -2.0f * newPos)[3]);
+                genUboBufferObj(sun_light, lightUBO); // Pass single Light
+                mesh.draw(*m_selShader, lightUBO, false);
             }
 
             glBindVertexArray(0);
