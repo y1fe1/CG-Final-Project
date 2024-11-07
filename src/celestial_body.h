@@ -2,6 +2,10 @@
 
 #include "protocol.h"
 
+/**
+ * Represents a celestial body and provides functionality to
+ * hierarchically move it through space.
+ */
 class CelestialBody
 {
 private:
@@ -26,6 +30,10 @@ public:
     std::string getTexturePath() { return texturePath; }
     glm::vec3 kd() { return _kd; }
 
+    /**
+     * Updates the celestial body's position, given a frame number, an origin matrix
+     * and an orbit radius.
+     */
     void updateBodyPosition(uint frame, glm::mat4& orbitOriginMatrix, float orbitR)
     {
         glm::mat4 newMatrix = glm::mat4(1.0f);
@@ -33,10 +41,12 @@ public:
 
         if (stationary)
         {
+            // Only scale the model if the body is stationary.
             newMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(radius));
         }
         else
         {
+            // Otherwise, translate it into the orbit and apply rotation.
             glm::vec3 translation = glm::vec3(
                 orbitR * cos(angle),
                 yFactor * cos(angle),
@@ -48,7 +58,7 @@ public:
 
         if (rotateAroundAxis)
         {
-            // Rotation around the body's own axis
+            // Rotation around the body's own axis.
             glm::vec3 rotationAxis = glm::vec3(0.15, -1, -0.15);
             newMatrix = glm::rotate(newMatrix, angle * 4, rotationAxis);
         }
@@ -56,6 +66,9 @@ public:
         matrix = newMatrix;
     }
 
+    /**
+     * Parameters for a Sun body.
+     */
     static CelestialBody Sun()
     {
         CelestialBody body{};
@@ -69,6 +82,9 @@ public:
         return body;
     }
 
+    /**
+     * Parameters for an Earth body.
+     */
     static CelestialBody Earth()
     {
         CelestialBody body{};
@@ -81,6 +97,9 @@ public:
         return body;
     }
 
+    /**
+     * Parameters for a Moon body.
+     */
     static CelestialBody Moon()
     {
         CelestialBody body{};
