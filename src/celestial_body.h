@@ -28,21 +28,23 @@ public:
 
     void updateBodyPosition(uint frame, glm::mat4& orbitOriginMatrix, float orbitR)
     {
+        glm::mat4 newMatrix = glm::mat4(1.0f);
+        float angle = glm::radians(speed * (float)frame);
+
         if (stationary)
         {
-            matrix = glm::scale(translate(glm::mat4(1.0f), glm::vec3(-1.0f, -1.0f, 0.0f)), glm::vec3(radius));
-            return;
+            newMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(radius));
         }
+        else
+        {
+            glm::vec3 translation = glm::vec3(
+                orbitR * cos(angle),
+                yFactor * cos(angle),
+                orbitR * sin(angle)
+            ) + glm::vec3(orbitOriginMatrix[3]);
 
-        float angle = glm::radians(speed * (float)frame);
-        glm::vec3 translation = glm::vec3(
-            orbitR * cos(angle),
-            yFactor * cos(angle),
-            orbitR * sin(angle)
-        ) + glm::vec3(orbitOriginMatrix[3]);
-
-        glm::mat4 newMatrix = glm::mat4(1.0f);
-        newMatrix = glm::scale(translate(newMatrix, translation), glm::vec3(radius));
+            newMatrix = glm::scale(translate(newMatrix, translation), glm::vec3(radius));
+        }
 
         if (rotateAroundAxis)
         {
@@ -62,6 +64,8 @@ public:
         body.orbitRadius = 12.5f;
         body.radius = 3.0f;
         body.stationary = true;
+        body.speed = 0.005f;
+        body.rotateAroundAxis = true;
         return body;
     }
 

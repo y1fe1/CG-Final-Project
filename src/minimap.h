@@ -22,8 +22,8 @@ public:
 
 private:
     //static constexpr glm::vec3 s_yAxis{ 0, 1, 0 };
-    glm::vec3 m_position{ 0, 20, 0 };   
-    glm::vec3 m_forward{ 0, -1, 0 };    
+    glm::vec3 m_position{ 0, 60, 0 };   
+    glm::vec3 m_forward{ 0, -1, 0 };
     glm::vec3 m_up{ 0, 0, -1 };         
 
 

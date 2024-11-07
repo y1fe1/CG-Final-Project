@@ -537,8 +537,6 @@ void Application::update() {
 
                     // Generate UBOs and draw
                     drawMultiLightShader(mesh, multiLightShadingEnabled);
-
-                    renderMiniMap();
                     
                     int lightsCnt = static_cast<int>(lights.size());
                     glBindVertexArray(mesh.getVao());
@@ -564,6 +562,11 @@ void Application::update() {
                     glBindVertexArray(0);
 
                     mesh.drawBasic(m_lightShader);
+
+                    if (render_minimap)
+                    {
+                        renderMiniMapItem(m_modelMatrix);
+                    }
                 }
             }
             #pragma endregion
@@ -571,6 +574,11 @@ void Application::update() {
 
         //Draw Env Map
         drawEnvMap(envMapEnabled, hdrMapEnabled);//MARK
+
+        if (render_minimap)
+        {
+            renderMiniMap();
+        }
         
         GLint viewport[4];
         glGetIntegerv(GL_VIEWPORT, viewport);
@@ -909,6 +917,10 @@ void Application::imgui() {
     ImGui::Begin("Assignment 2 Demo");
 
     ImGui::Separator();
+    ImGui::Text("Minimap");
+    ImGui::Checkbox("Show Minimap", &render_minimap);
+
+    ImGui::Separator();
     ImGui::Text("Hierarchical Rendering");
     ImGui::Checkbox("Show Solar System", &showSolarSystem);
     ImGui::SliderFloat("Sunlight Strength", &sunlight_strength, 0.0f, 5.0f);
@@ -919,7 +931,6 @@ void Application::imgui() {
 
     ImGui::Separator();
     ImGui::Text("Displacement mapping");
-
     if (ImGui::Checkbox("Enable Normal Mapping", &useNormalMapping))
     {
         useParallaxMapping = false;
@@ -1093,19 +1104,24 @@ void Application::onMouseReleased(int button, int mods) {
     std::cout << "Released mouse button: " << button << std::endl;
 }
 
-
-
-void Application::renderMiniMap() {
+void Application::renderMiniMapItem(glm::mat4 modelMatrix)
+{
     GLint previousVBO;
     glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &previousVBO);
 
     glViewport(800, 800, 200, 200); // Make it to up-right
+    glDisable(GL_DEPTH);
 
     // 使用小地图的视图矩阵和投影矩阵渲染场景
     m_selShader->bind();
-    const glm::mat4 mvpMatrix = minimap.projectionMatrix() * minimap.viewMatrix() * m_modelMatrix;
-    // glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+    const glm::mat4 mvpMatrix = minimap.projectionMatrix() * minimap.viewMatrix() * modelMatrix;
+    // const glm::vec3 newPos = glm::vec3(newMatrix[3]);
+    const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(modelMatrix));
     glUniformMatrix4fv(m_selShader->getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+    glUniformMatrix4fv(m_selShader->getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
+    glUniformMatrix4fv(m_selShader->getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
+    // glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(minimap.cameraPos()));
+    glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(glm::vec3(0.0f, 80.0f, 0.0f)));
 
     // 渲染小地图内容
     for (GPUMesh& mesh : m_meshes) {
@@ -1117,6 +1133,19 @@ void Application::renderMiniMap() {
         }
     }
 
+    // 恢复主视口
+    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+    glEnable(GL_DEPTH);
+    glBindBuffer(GL_ARRAY_BUFFER, previousVBO);
+}
+
+void Application::renderMiniMap() {
+    GLint previousVBO;
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &previousVBO);
+
+    glViewport(800, 800, 200, 200); // Make it to up-right
+    glDisable(GL_DEPTH);
+
     const glm::mat4 minimapVP = minimap.projectionMatrix() * minimap.viewMatrix() * m_modelMatrix;
     glm::vec4 cameraPosInMinimap = minimapVP * glm::vec4(selectedCamera->cameraPos(), 1.0f);
 
@@ -1127,6 +1156,7 @@ void Application::renderMiniMap() {
     // 恢复主视口
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
     drawMiniMapBorder();
+    glEnable(GL_DEPTH);
     glBindBuffer(GL_ARRAY_BUFFER, previousVBO);
 }
 
@@ -1380,7 +1410,7 @@ void Application::drawMultiLightShader(GPUMesh& mesh,bool multiLightShadingEnabl
 // This should only ever be ran if the selected mesh
 // is sphere.obj.
 void Application::renderSolarSystem() {
-    if (moveCelestialBodies)
+    if (moveCelestialBodies || frame == 0)
     {
         updateFrameNumber();
     }
@@ -1448,29 +1478,42 @@ void Application::renderSolarSystem() {
             glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
             glUniform1i(m_selShader->getUniformLocation("useEnvMap"), GL_FALSE);
 
-            Texture* bodyTexture = findCelestialTexture(body.getTexturePath() + ".jpg");
-            if (bodyTexture != NULL)
+            if (textureEnabled)
             {
-                bool hasTexCoords = mesh.hasTextureCoords();
-                bodyTexture->bind(hasTexCoords ? GL_TEXTURE0 : 0);
-                glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), hasTexCoords);
-            } else {
-                glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), GL_FALSE);
-            }
-
-            if (useNormalMapping) {
-                Texture* normalTexture = findCelestialTexture(body.getTexturePath() + "_normal.png");
-                if (normalTexture != NULL)
+                Texture* bodyTexture = findCelestialTexture(body.getTexturePath() + ".jpg");
+                if (bodyTexture != NULL)
                 {
-                    glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_TRUE);
-                    normalTexture->bind(GL_TEXTURE3);
-                    glUniform1i(m_selShader->getUniformLocation("normalTex"), 3);
+                    bool hasTexCoords = mesh.hasTextureCoords();
+                    bodyTexture->bind(hasTexCoords ? GL_TEXTURE0 : 0);
+                    glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), hasTexCoords);
+                    glUniform1i(m_selShader->getUniformLocation("colorMap"), hasTexCoords ? 0 : -1);
+                } else {
+                    glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), GL_FALSE);
+                }
+
+                if (useNormalMapping)
+                {
+                    Texture* normalTexture = findCelestialTexture(body.getTexturePath() + "_normal.png");
+                    if (normalTexture != NULL)
+                    {
+                        glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_TRUE);
+                        normalTexture->bind(GL_TEXTURE3);
+                        glUniform1i(m_selShader->getUniformLocation("normalTex"), 3);
+                    }
+                    else
+                    {
+                        glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_FALSE);
+                    }
                 }
                 else
                 {
                     glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_FALSE);
                 }
-            } else {
+            }
+            else
+            {
+                glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), GL_FALSE);
+                glUniform1i(m_selShader->getUniformLocation("colorMap"), -1);
                 glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_FALSE);
             }
 
@@ -1485,6 +1528,11 @@ void Application::renderSolarSystem() {
             }
 
             glBindVertexArray(0);
+        }
+
+        if (render_minimap)
+        {
+            renderMiniMapItem(newMatrix);
         }
     }
 

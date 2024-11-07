@@ -182,10 +182,12 @@ private:
     void applyNormalTexture();
     
     //Minimap
+    void renderMiniMapItem(glm::mat4 modelMatrix);
     void renderMiniMap();
     void drawMiniMapBorder();
     void drawCameraPositionOnMinimap(const glm::vec4& cameraPosInMinimap);
     Minimap minimap;
+    bool render_minimap = false;
 
     //Post-Process Shader
     bool usePostProcess = false;

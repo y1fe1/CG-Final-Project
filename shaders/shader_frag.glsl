@@ -253,9 +253,11 @@ void main()
     else if (hasTexCoords) {
         // Fallback: use texture color only if available
         fragColor = texColor;
-    } else { 
-        fragColor = vec4(normal, 1); 
-    } // Output color value, change from (1, 0, 0) to something else
+    }
+    else { 
+        // Display the normal if nothing else is selected
+        fragColor = vec4(normal, 1.0); 
+    }
 }
 
 
