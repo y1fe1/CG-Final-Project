@@ -49,6 +49,8 @@ uniform sampler2D colorMap;
 uniform bool hasTexCoords;
 uniform bool useMaterial;
 
+uniform bool ignoreLightDirection;
+uniform float sunlightStrength;
 uniform bool useNormalMapping;
 uniform bool useParallaxMapping;
 uniform sampler2D normalTex;
@@ -109,7 +111,7 @@ float shadowFactorCal(vec2 shadowMapCoord, float fragLightDepth){
 
 float getLightAttenuationFactor(vec3 lightDir) {
     float dist = length(lightDir);
-    float attenuation = 1.0 / (1.0 +  linear * dist + quadratic*dist * dist); // Simple quadratic falloff
+    float attenuation = 1.0 / (1.0 + (linear * dist) + (quadratic * dist * dist)); // Simple quadratic falloff
 
     // Clamp the attenuation to avoid excessively bright values at close distances
     return clamp(attenuation, 0.0, 1.0);
@@ -180,7 +182,7 @@ void main()
 
     // Shadow map coordinates (XY)
     vec2 shadowMapCoord = fragLightCoord.xy;
-    float shadowFactor = (shadowEnabled)? shadowFactorCal(shadowMapCoord,fragLightDepth) : 0.0f;
+    float shadowFactor = (shadowEnabled) ? shadowFactorCal(shadowMapCoord, fragLightDepth) : 0.0f;
 
     vec3 Specular = vec3(0.0f);
 
@@ -190,7 +192,7 @@ void main()
     vec3 reflectDir = reflect(-lightDir, normal);
     vec3 halfDir = normalize(lightDir + viewDir);
 
-    float lambert = max(dot(normal,lightDir),0.0);
+    float lambert = ignoreLightDirection ? abs(dot(normal, lightDir)) : max(dot(normal, lightDir), 0.0);
     //vec3 ambient = ambientColor;
     
     vec3 finalColor = vec3(0.0f);
@@ -216,27 +218,22 @@ void main()
         finalEnvColor = (hasTexCoords) ? envColor * texColor.rgb : envColor;
     }
 
-    if (useMaterial)   { 
+    if (useMaterial) { 
         
         //lambert factor
-        vec3 diffuse = (hasTexCoords)? lambert*kd*texColor.rgb : lambert*kd;
+        vec3 diffuse = (hasTexCoords) ? lambert * kd * texColor.rgb : lambert * kd;
         
         //basic blinn-phong model
-        if(lambert >= 0.0) {
-            Specular = ks * pow(max(dot(halfDir,normal), 0.0f), shininess);
+        if(lambert >= 0.0 && !ignoreLightDirection && shininess > 0.001) {
+            Specular = ks * pow(max(dot(halfDir, normal), 0.0f), shininess);
             Specular = (hasTexCoords)? texColor.rgb * Specular : Specular;
         }
         
         // Calculate the light attenuation factor based on distance
         float lightAttenuationFactor = getLightAttenuationFactor(lightDir);
 
-        //vec3 finalColor = (ambient + diffuse + Specular);
-        //vec3 finalColor = (diffuse + Specular);
-        //vec3 finalColor = diffuse;
-        //vec3 finalColor = Specular;
         finalColor = Specular + color * diffuse;
-
-        finalColor = finalColor * (1-shadowFactor) * lightAttenuationFactor;
+        finalColor = finalColor * (1.0 - shadowFactor) * lightAttenuationFactor * sunlightStrength;
     }
 
     float reflectionStrength = 1.0f;

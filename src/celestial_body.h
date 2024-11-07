@@ -14,6 +14,8 @@ private:
     bool stationary = false;
     bool rotateAroundAxis = false;
 
+    glm::vec3 _kd = glm::vec3(1.0f);
+
     std::string texturePath;
 
 public:
@@ -22,6 +24,7 @@ public:
     glm::mat4 getMatrix() { return matrix; }
     float getOrbitRadius() { return orbitRadius; }
     std::string getTexturePath() { return texturePath; }
+    glm::vec3 kd() { return _kd; }
 
     void updateBodyPosition(uint frame, glm::mat4& orbitOriginMatrix, float orbitR)
     {
@@ -55,8 +58,9 @@ public:
     {
         CelestialBody body{};
         body.texturePath = "resources/celestial_bodies/sun";
-        body.orbitRadius = 7.5f;
-        body.radius = 2.5f;
+        body._kd = glm::vec3(0.998f, 0.898f, 0.439f);
+        body.orbitRadius = 12.5f;
+        body.radius = 3.0f;
         body.stationary = true;
         return body;
     }
@@ -65,7 +69,7 @@ public:
     {
         CelestialBody body{};
         body.texturePath = "resources/celestial_bodies/earth";
-        body.orbitRadius = 1.4f;
+        body.orbitRadius = 1.9f;
         body.speed = 0.1f;
         body.radius = 1.0f;
         body.yFactor = -0.2f;

@@ -20,15 +20,21 @@ out mat3 TBN; // Used in normal mapping
 
 mat3 generateTBN()
 {
+    vec3 norm       = normalize(vec3(modelMatrix * vec4(normal, 0.0)));
+
     // Get two edges by adding the normal to the vertex position.
-    vec3 edge1      = vec3(modelMatrix * vec4(position + normal, 1.0)) - position;
-    vec3 edge2      = vec3(modelMatrix * vec4(position + vec3(normal.y, -normal.x, normal.z), 1.0)) - position;
+    vec3 edge1      = vec3(modelMatrix * vec4(position + norm, 1.0)) - position;
+    vec3 edge2      = vec3(modelMatrix * vec4(position + vec3(norm.y, -norm.x, norm.z), 1.0)) - position;
     // Assume two arbitrary UV edges.
     vec2 deltaUV1   = vec2(1.0, 0.0);
     vec2 deltaUV2   = vec2(0.0, 1.0);
     // Calculate tangent and bitangent.
     vec3 tangent    = normalize(edge1 * deltaUV2.t - edge2 * deltaUV1.t);
-    vec3 bitangent  = normalize(edge2 * deltaUV1.s - edge1 * deltaUV2.s);
+
+    // Gram-Schmidt
+    tangent         = normalize(vec3(modelMatrix * vec4(tangent, 0.0)));
+    tangent         = normalize(tangent - dot(tangent, norm) * norm);
+    vec3 bitangent  = cross(norm, tangent);
 
     // Approximate the texture coordinate at the given vertex position.
     // This is only necessary if the texture coordinates are not given.

@@ -217,6 +217,7 @@ private:
     void updateFrameNumber();
     void renderSolarSystem();
     bool moveCelestialBodies = false;
+    float sunlight_strength = 2.8f;
     Light sun_light;
 
 public:

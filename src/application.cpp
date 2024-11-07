@@ -41,7 +41,7 @@ Application::Application()
     
     // inits for hierarchical rendering
     , celestialBodies { CelestialBody::Sun(), CelestialBody::Earth(), CelestialBody::Moon() }
-    , sun_light {}
+    , sun_light { }
 {
     //Camera defaultCamera = Camera(&m_window);
 
@@ -374,6 +374,8 @@ void Application::update() {
 
                     m_selShader->bind();
 
+                    glUniform1i(m_selShader->getUniformLocation("ignoreLightDirection"), GL_FALSE);
+                    glUniform1f(m_selShader->getUniformLocation("sunlightStrength"), 1.0f);
                     glUniformMatrix4fv(m_selShader->getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(view));
                     glUniformMatrix4fv(m_selShader->getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
@@ -484,6 +486,8 @@ void Application::update() {
                     glUniformMatrix4fv(m_selShader->getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(m_modelMatrix));
                     glUniformMatrix4fv(m_selShader->getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
                     glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+                    glUniform1i(m_selShader->getUniformLocation("ignoreLightDirection"), GL_FALSE);
+                    glUniform1f(m_selShader->getUniformLocation("sunlightStrength"), 1.0f);
 
                     // Texture and material settings
                     bool hasTexCoords = mesh.hasTextureCoords();
@@ -908,6 +912,7 @@ void Application::imgui() {
     ImGui::Separator();
     ImGui::Text("Hierarchical Rendering");
     ImGui::Checkbox("Show Solar System", &showSolarSystem);
+    ImGui::SliderFloat("Sunlight Strength", &sunlight_strength, 0.0f, 5.0f);
     ImGui::Checkbox("Move Celestial Bodies", &moveCelestialBodies);
 
     if (showSolarSystem) { selectedSkybox = &celestialSkyboxTexture; }
@@ -924,6 +929,7 @@ void Application::imgui() {
     {
         useNormalMapping = false;
     }
+    ImGui::Text("Normal and parallax mapping are only applied to applicable meshes.");
 
     ImGui::Separator();
     ImGui::Text("Environment Map parameters");
@@ -1459,8 +1465,16 @@ void Application::renderSolarSystem() {
         const glm::mat4 lightMVP = projection * lightViewMatrix;
         
         for (GPUMesh& mesh : m_meshes) {
+            glBindVertexArray(mesh.getVao());
+
+            m_selShader->bind();
+
             GLuint newUBOMaterial;
             GPUMaterial gpuMat = GPUMaterial(m_Material);
+            gpuMat.kd = body.kd();
+            gpuMat.ks = glm::vec3(0.0f);    // No specular reflection in space
+            // gpuMat.shininess = 0.0f;
+            gpuMat.shininess = 0.0f;
             genUboBufferObj(gpuMat, newUBOMaterial);
             mesh.setUBOMaterial(newUBOMaterial);
 
@@ -1468,16 +1482,16 @@ void Application::renderSolarSystem() {
             GLuint shadowSettingUbo;
             genUboBufferObj(shadowSettings, shadowSettingUbo);
 
-            glBindVertexArray(mesh.getVao());
-
-            m_selShader->bind();
-            
             glUniformMatrix4fv(m_selShader->getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
             glUniformMatrix4fv(m_selShader->getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
             glUniformMatrix4fv(m_selShader->getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(newMatrix));
             glUniformMatrix4fv(m_selShader->getUniformLocation("lightMVP"), 1, GL_FALSE, glm::value_ptr(lightMVP));
             glUniform3fv(m_selShader->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+            glUniform1f(m_selShader->getUniformLocation("sunlightStrength"), sunlight_strength);
             glUniform1i(m_selShader->getUniformLocation("useMaterial"), true);
+
+            // Ignore the position of the light with respect to the object if it is the Sun
+            glUniform1i(m_selShader->getUniformLocation("ignoreLightDirection"), i == 0);
 
             m_shadowTex.bind(GL_TEXTURE1);
             glUniform1i(m_selShader->getUniformLocation("texShadow"), 1);
@@ -1513,7 +1527,8 @@ void Application::renderSolarSystem() {
                 mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
             }
             else {
-                sun_light.position = glm::vec3(translate(inverse(newMatrix), -2.0f * newPos)[3]);
+                sun_light.position  = (i == 0) ? glm::vec3(0.0f) : glm::vec3(translate(inverse(newMatrix), -1.0f * newPos)[3]);
+                sun_light.color     = body.kd();
                 genUboBufferObj(sun_light, lightUBO); // Pass single Light
                 mesh.draw(*m_selShader, lightUBO, false);
             }
