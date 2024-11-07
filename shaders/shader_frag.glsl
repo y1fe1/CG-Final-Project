@@ -50,7 +50,9 @@ uniform bool hasTexCoords;
 uniform bool useMaterial;
 
 uniform bool useNormalMapping;
+uniform bool useParallaxMapping;
 uniform sampler2D normalTex;
+uniform sampler2D heightTex;
 
 uniform vec3 ambientColor;
 
@@ -113,13 +115,49 @@ float getLightAttenuationFactor(vec3 lightDir) {
     return clamp(attenuation, 0.0, 1.0);
 }
 
+float getHeightFromMap(vec2 texPos) {
+    vec3 height = texture(heightTex, texPos).rgb;
+    return height.r;
+}
+
+vec2 parallaxTexCoords() {
+    mat3 trTBN = transpose(TBN);
+    vec3 viewDir = normalize(trTBN * viewPos - trTBN * fragPosition);
+
+    float layers = mix(256.0, 8.0, max(dot(vec3(0.0, 0.0, 1.0), viewDir), 0.0));
+
+    vec2 delta = (viewDir.xy / viewDir.z) * 0.025 / layers;
+
+    vec2 currentCoords = fragTexCoord;
+    float currentHeightMapVal = getHeightFromMap(fragTexCoord);
+
+    float layerDepth = 1.0 / layers;
+    float currentHeight = 0.0;
+
+    while (currentHeight < currentHeightMapVal) {
+        currentCoords -= delta;
+        currentHeightMapVal = getHeightFromMap(currentCoords);
+        currentHeight += layerDepth;
+    }
+
+    vec2 prevCoords = currentCoords + delta;
+    float beforeDepth = getHeightFromMap(prevCoords) - currentHeight + layerDepth;
+    float afterDepth = currentHeightMapVal - currentHeight;
+
+    float weight = afterDepth / (afterDepth - beforeDepth);
+    vec2 parallaxCoords = prevCoords * weight + currentCoords * (1.0 - weight);
+    parallaxCoords = vec2(clamp(parallaxCoords.x, 0.0, 1.0), clamp(parallaxCoords.y, 0.0, 1.0));
+    return parallaxCoords;
+}
+
 void main()
 {
+    vec2 texCoord = useParallaxMapping ? parallaxTexCoords() : fragTexCoord;
     vec3 normal;
     
     if (useNormalMapping)
     {
-        normal = texture(normalTex, fragTexCoord).rgb; // Take the normal from the normal map texture.
+        normal = texture(normalTex, texCoord).rgb; // Take the normal from the normal map texture.
         normal = normal * 2.0 - 1.0; // Re-convert from [0, 1] to [-1, 1].
         normal = normalize(TBN * normal); // Transform with TBN.
     }
@@ -160,8 +198,8 @@ void main()
     //texColor
     vec4 texColor = vec4(0.0f);
 
-    if (hasTexCoords)       {
-       texColor = texture(colorMap, fragTexCoord); 
+    if (hasTexCoords) {
+       texColor = texture(colorMap, texCoord); 
     }
 
     // Env Mapping

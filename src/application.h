@@ -177,6 +177,7 @@ private:
 
     //Normal mapping
     bool useNormalMapping { false };
+    bool useParallaxMapping { false };
     GLuint normalTex;
     void applyNormalTexture();
     
@@ -215,6 +216,7 @@ private:
     Texture* findCelestialTexture(std::string celestialTexturePath);
     void updateFrameNumber();
     void renderSolarSystem();
+    bool moveCelestialBodies = false;
     Light sun_light;
 
 public:

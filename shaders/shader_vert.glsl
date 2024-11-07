@@ -7,6 +7,7 @@ uniform mat4 modelMatrix;
 uniform mat3 normalModelMatrix;
 uniform bool hasTexCoords;
 uniform bool useNormalMapping;
+uniform bool useParallaxMapping;
 
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
@@ -47,7 +48,7 @@ void main()
     fragNormal      = normalModelMatrix * normal;
     fragTexCoord    = texCoord;
 
-    if (useNormalMapping)
+    if (useNormalMapping || useParallaxMapping)
     {
         TBN = generateTBN();
     }

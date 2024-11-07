@@ -908,12 +908,24 @@ void Application::imgui() {
     ImGui::Separator();
     ImGui::Text("Hierarchical Rendering");
     ImGui::Checkbox("Show Solar System", &showSolarSystem);
+    ImGui::Checkbox("Move Celestial Bodies", &moveCelestialBodies);
+
+    if (showSolarSystem) { selectedSkybox = &celestialSkyboxTexture; }
+    else { selectedSkybox = &skyboxTexture; }
 
     ImGui::Separator();
-    ImGui::Checkbox("Switch to Deferred Rendering Pipeline", &ssaoEnabled);
+    ImGui::Text("Displacement mapping");
+
+    if (ImGui::Checkbox("Enable Normal Mapping", &useNormalMapping))
+    {
+        useParallaxMapping = false;
+    }
+    if (ImGui::Checkbox("Enable Parallax Mapping", &useParallaxMapping))
+    {
+        useNormalMapping = false;
+    }
 
     ImGui::Separator();
-
     ImGui::Text("Environment Map parameters");
     ImGui::Checkbox("Enable Environment Map", &envMapEnabled); // only for single light now
     ImGui::Checkbox("Enable HDR Environment", &hdrMapEnabled);
@@ -970,6 +982,8 @@ void Application::imgui() {
     ImGui::Checkbox("Shadow Enabled", &shadowSettings.shadowEnabled);
     ImGui::Checkbox("PCF Enabled", &shadowSettings.pcfEnabled);
 
+    ImGui::Separator();
+    ImGui::Checkbox("Switch to Deferred Rendering Pipeline", &ssaoEnabled);
 
     ImGui::Separator();
     ImGui::Text("Cameras:");
@@ -1006,13 +1020,6 @@ void Application::imgui() {
     if (ImGui::Button("Reset Cameras")) {
         //resetObjList(cameras,defaultLight);
     }
-
-    ImGui::Separator();
-    ImGui::Text("Normal mapping");
-    ImGui::Checkbox("Normal Mapping Enabled", &useNormalMapping);
-
-    if (showSolarSystem) { selectedSkybox = &celestialSkyboxTexture; }
-    else { selectedSkybox = &skyboxTexture; }
 
     ImGui::Separator();
     ImGui::Text("Lights");
@@ -1416,7 +1423,10 @@ void Application::drawMultiLightShader(GPUMesh& mesh,bool multiLightShadingEnabl
 // This should only ever be ran if the selected mesh
 // is sphere.obj.
 void Application::renderSolarSystem() {
-    updateFrameNumber();
+    if (moveCelestialBodies)
+    {
+        updateFrameNumber();
+    }
 
     m_selShader = &m_defaultShader;
 
@@ -1478,6 +1488,9 @@ void Application::renderSolarSystem() {
             {
                 bool hasTexCoords = mesh.hasTextureCoords();
                 bodyTexture->bind(hasTexCoords ? GL_TEXTURE0 : 0);
+                glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), hasTexCoords);
+            } else {
+                glUniform1i(m_selShader->getUniformLocation("hasTexCoords"), GL_FALSE);
             }
 
             if (useNormalMapping) {
