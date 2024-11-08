@@ -892,11 +892,11 @@ void Application::imgui() {
     {
         useParallaxMapping = false;
     }
-    if (ImGui::Checkbox("Enable Parallax Mapping", &useParallaxMapping))
-    {
-        useNormalMapping = false;
-    }
-    ImGui::Text("Normal and parallax mapping are only applied to applicable meshes.");
+    // if (ImGui::Checkbox("Enable Parallax Mapping", &useParallaxMapping))
+    // {
+    //     useNormalMapping = false;
+    // }
+    // ImGui::Text("Normal and parallax mapping are only applied to applicable meshes.");
 
     ImGui::Separator();
     ImGui::Text("Environment Map parameters");
