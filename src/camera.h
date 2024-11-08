@@ -23,6 +23,7 @@ public:
     glm::mat4 viewMatrix() const;
     bool m_useBezier{ false };
     bool m_bezierConstantSpeed{ false };
+    bool useLockView{ false };
 
     //Bezier params
     glm::vec3 P0 = { 0.0f, 4.0f, 0.0f };

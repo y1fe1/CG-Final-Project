@@ -987,6 +987,7 @@ void Application::imgui() {
         ImGui::Text("Selected Camera Index: %d", curCameraIndex);
         ImGui::Checkbox("Use Bezier", &selectedCamera->m_useBezier);
         ImGui::Checkbox("Use Constant Speed", &selectedCamera->m_bezierConstantSpeed);
+        ImGui::Checkbox("Lock View", &selectedCamera->useLockView);
         ImGui::DragFloat3("P0", &selectedCamera->P0.x);
         ImGui::DragFloat3("P1", &selectedCamera->P1.x);
         ImGui::DragFloat3("P2", &selectedCamera->P2.x);

@@ -29,7 +29,12 @@ glm::vec3 Camera::cameraPos() const
 
 glm::mat4 Camera::viewMatrix() const
 {
-    return glm::lookAt(m_position, m_position + m_forward, m_up);
+    if (useLockView) {
+        glm::vec3 targetPosition = glm::vec3(0.0f, 0.0f, 0.0f);
+        glm::vec3 newForward = glm::normalize(targetPosition - m_position); // 计算指向原点的方向
+        return glm::lookAt(m_position, m_position + newForward, glm::vec3(0,1,0));
+    }
+    else return glm::lookAt(m_position, m_position + m_forward, m_up);
 }
 
 void Camera::rotateX(float angle)
