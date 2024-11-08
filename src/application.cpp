@@ -89,7 +89,8 @@ Application::Application()
 
     // then before rendering, configure the viewport to the original framebuffer's screen dimensions
     glm::ivec2 windowSizes = m_window.getWindowSize();
-    glViewport(0, 0, windowSizes.x, windowSizes.y);
+    //glViewport(0, 0, windowSizes.x, windowSizes.y);
+    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
     initMaterialTexture();
 
