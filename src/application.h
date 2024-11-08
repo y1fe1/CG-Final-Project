@@ -80,7 +80,7 @@ private:
 
     GLuint captureFBO, captureRBO; // framebuffers
 
-    std::filesystem::path hdrSamplePath{ RESOURCE_ROOT HDR_PATH "warm_restaurant_night_4k.hdr" };
+    std::filesystem::path hdrSamplePath{ RESOURCE_ROOT HDR_PATH "Free_Galaxies_8k.hdr" };
     hdrTexture hdrTextureMap;
 
     cubeMapTex hdrCubeMap;
@@ -105,6 +105,9 @@ private:
 
     bool ssaoEnabled = false;
     bool defRenderBufferGenerated = false;
+
+    bool defRenderLightGen = false;
+
     // SSAO Processing Shader
     Shader m_shaderGeometryPass;
     Shader m_shaderLightingPass;
@@ -210,7 +213,7 @@ private:
 
     //Hierarchical transformation
     bool showSolarSystem = false;
-    uint frame = 0;
+    glm::uint frame = 0;
     std::array<CelestialBody, 3> celestialBodies;
     std::map<std::string, Texture> celestialTextures;
     void initCelestialTextures();

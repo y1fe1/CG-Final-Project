@@ -34,7 +34,7 @@ public:
      * Updates the celestial body's position, given a frame number, an origin matrix
      * and an orbit radius.
      */
-    void updateBodyPosition(uint frame, glm::mat4& orbitOriginMatrix, float orbitR)
+    void updateBodyPosition(glm::uint frame, glm::mat4& orbitOriginMatrix, float orbitR)
     {
         glm::mat4 newMatrix = glm::mat4(1.0f);
         float angle = glm::radians(speed * (float)frame);

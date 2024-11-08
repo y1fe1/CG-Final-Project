@@ -19,7 +19,7 @@ Application::Application()
     m_PbrMaterial{ glm::vec3{ 0.8, 0.6, 0.4 }, 1.0f, 0.2f, 1.0f }
 
     //init skyboxTex
-    , skyboxTexture(faces)
+    , skyboxTexture(celestialFaces)
     , celestialSkyboxTexture(celestialFaces)
     //init hdrTex and hdr cubemap
     , hdrTextureMap(hdrSamplePath)
@@ -387,6 +387,8 @@ void Application::update() {
                         renderHDRCubeMap(cubeVAO, cubeVBO, hdrMapVertices, 288);
                     }
 
+                    defRenderLightGen = true;
+
                     /*
                     m_deferredDebugShader.bind();
                     gNor.bind(GL_TEXTURE0);
@@ -398,16 +400,20 @@ void Application::update() {
 
                 else 
                 {
-                    lights.clear();
+                    if (defRenderLightGen) {
+                        lights.clear();
 
-                    // lights must be initialized here since light is still struct not class
-                    lights.push_back(
-                        { glm::vec3(1, 3, -2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
-                    );
+                        // lights must be initialized here since light is still struct not class
+                        lights.push_back(
+                            { glm::vec3(1, 3, -2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
+                        );
 
-                    lights.push_back(
-                        { glm::vec3(-1, 3, 2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
-                    );
+                        lights.push_back(
+                            { glm::vec3(-1, 3, 2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ }
+                        );
+
+                        defRenderLightGen = false;
+                    }
 
                     GLuint PbrUBO;
 
@@ -897,23 +903,6 @@ void Application::imgui() {
     ImGui::Checkbox("Enable HDR Environment", &hdrMapEnabled);
 
     ImGui::Separator();
-    ImGui::Text("Texture parameters");
-
-    ImGui::Checkbox("Enable Texture for model", &textureEnabled);
-
-    std::strncpy(file_path_buffer, texturePath.c_str(), sizeof(file_path_buffer) - 1);
-    ImGui::InputText("Texture Path:", file_path_buffer, sizeof(file_path_buffer));
-    if(ImGui::Button("Regenerate Texture")) {
-        try {
-            texturePath = file_path_buffer;
-            m_texture = Texture(RESOURCE_ROOT + texturePath);
-        }
-        catch (textureLoadingException e) {
-            std::cerr << e.what() << std::endl;
-        }
-    }
-
-    ImGui::Separator();
 
     ImGui::Checkbox("Enable Material for model", &m_useMaterial);
 
@@ -931,6 +920,23 @@ void Application::imgui() {
          ImGui::SliderFloat("Toon Specular Threshold", &m_Material.toonSpecularThreshold, 0.0f, 1.0f);*/
 
         this->usePbrShading = false;
+
+        ImGui::Separator();
+        ImGui::Text("Texture parameters");
+
+        ImGui::Checkbox("Enable Texture for model", &textureEnabled);
+
+        std::strncpy(file_path_buffer, texturePath.c_str(), sizeof(file_path_buffer) - 1);
+        ImGui::InputText("Texture Path:", file_path_buffer, sizeof(file_path_buffer));
+        if (ImGui::Button("Regenerate Texture")) {
+            try {
+                texturePath = file_path_buffer;
+                m_texture = Texture(RESOURCE_ROOT + texturePath);
+            }
+            catch (textureLoadingException e) {
+                std::cerr << e.what() << std::endl;
+            }
+        }
     }
     else if (static_cast<MaterialModel>(curMaterialIndex) == MaterialModel::PBR) {
         ImGui::Separator();
@@ -941,94 +947,108 @@ void Application::imgui() {
         ImGui::SliderFloat("Ambient Occlusion", &m_PbrMaterial.ao, 0.0f, 1.0f);
 
         this->usePbrShading = true;
+        this->multiLightShadingEnabled = true;
+
+        ImGui::Separator();
+        ImGui::Text("PBR Texture parameters");
+
+        ImGui::Checkbox("Enable Texture for model", &textureEnabled);
+
+        std::strncpy(file_path_buffer, hdrSamplePath.string().c_str(), sizeof(file_path_buffer) - 1);
+        ImGui::InputText("Texture Path:", file_path_buffer, sizeof(file_path_buffer));
     }
 
     ImGui::Separator();
-    ImGui::Text("Shadow modes");
-    ImGui::Checkbox("Shadow Enabled", &shadowSettings.shadowEnabled);
-    ImGui::Checkbox("PCF Enabled", &shadowSettings.pcfEnabled);
-
-    ImGui::Separator();
-    ImGui::Checkbox("Switch to Deferred Rendering Pipeline", &ssaoEnabled);
-
-    ImGui::Separator();
-    ImGui::Text("Cameras:");
-
+    
     std::vector<std::string> itemStrings;
-    for (size_t i = 0; i < cameras.size(); i++) {
-        itemStrings.push_back("Camera " + std::to_string(i));
-    }
-
     std::vector<const char*> itemCStrings;
-    for (const auto& string : itemStrings) {
-        itemCStrings.push_back(string.c_str());
-    }
 
     int tempSelectedItem = static_cast<int>(curCameraIndex);
-    if (ImGui::ListBox("Cameras", &tempSelectedItem, itemCStrings.data(), (int)itemCStrings.size(), 4)) {
-        selectedCamera->setUserInteraction(false);
-        curCameraIndex = static_cast<size_t>(tempSelectedItem);
-        selectedCamera = &cameras.at(curCameraIndex);
-        selectedCamera->setUserInteraction(true);
-    }
 
-    selectedCamera = &cameras[curCameraIndex];
-    ImGui::Text("Selected Camera Index: %d", curCameraIndex);
-    ImGui::Checkbox("Use Bezier", &selectedCamera->m_useBezier);
-    ImGui::Checkbox("Use Constant Speed", &selectedCamera->m_bezierConstantSpeed);
-    ImGui::DragFloat3("P0", &selectedCamera->P0.x);
-    ImGui::DragFloat3("P1", &selectedCamera->P1.x);
-    ImGui::DragFloat3("P2", &selectedCamera->P2.x);
-    ImGui::DragFloat3("P3", &selectedCamera->P3.x);
+    if (ImGui::CollapsingHeader("Cameras")) {
+        ImGui::Text("Cameras:");
+        for (size_t i = 0; i < cameras.size(); i++) {
+            itemStrings.push_back("Camera " + std::to_string(i));
+        }
 
-    ImGui::Checkbox("usePostProcess", &usePostProcess);
-    // Button for clearing Camera
-    if (ImGui::Button("Reset Cameras")) {
-        //resetObjList(cameras,defaultLight);
-    }
+        for (const auto& string : itemStrings) {
+            itemCStrings.push_back(string.c_str());
+        }
 
-    ImGui::Separator();
-    ImGui::Text("Lights");
-    ImGui::Checkbox("MultiLightShading", &multiLightShadingEnabled);
-    itemStrings.clear();
-    for (size_t i = 0; i < lights.size(); i++) {
-        auto string = "Light " + std::to_string(i);
-        itemStrings.push_back(string);
-    }
+        if (ImGui::ListBox("Cameras", &tempSelectedItem, itemCStrings.data(), (int)itemCStrings.size(), 4)) {
+            selectedCamera->setUserInteraction(false);
+            curCameraIndex = static_cast<size_t>(tempSelectedItem);
+            selectedCamera = &cameras.at(curCameraIndex);
+            selectedCamera->setUserInteraction(true);
+        }
 
-    itemCStrings.clear();
-    for (const auto& string : itemStrings) {
-        itemCStrings.push_back(string.c_str());
-    }
+        selectedCamera = &cameras[curCameraIndex];
+        ImGui::Text("Selected Camera Index: %d", curCameraIndex);
+        ImGui::Checkbox("Use Bezier", &selectedCamera->m_useBezier);
+        ImGui::Checkbox("Use Constant Speed", &selectedCamera->m_bezierConstantSpeed);
+        ImGui::DragFloat3("P0", &selectedCamera->P0.x);
+        ImGui::DragFloat3("P1", &selectedCamera->P1.x);
+        ImGui::DragFloat3("P2", &selectedCamera->P2.x);
+        ImGui::DragFloat3("P3", &selectedCamera->P3.x);
 
-    tempSelectedItem = static_cast<int>(curLightIndex);
-    if (ImGui::ListBox("Lights", &tempSelectedItem, itemCStrings.data(), (int)itemCStrings.size(), 4)) {
-        curLightIndex = static_cast<size_t>(tempSelectedItem);
-    }
-
-    selectedLight = &lights[curLightIndex];
-    ImGui::Text("Selected Light Index: %d", curLightIndex);
-
-    ImGui::Checkbox("Has Texture", &selectedLight->has_texture);
-    ImGui::Checkbox("isSpotLight", &selectedLight->is_spotlight);
-    ImGui::ColorEdit3("Light Color", &selectedLight->color[0]);
-
-    ImGui::InputFloat3("Position", &selectedLight->position[0]);
-
-    if (ImGui::Button("Add Lights")) {
-        lights.push_back(Light{ glm::vec3(1, 3, -2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ });
-    }
-
-    if (ImGui::Button("Remove Lights")) {
-        lights.erase(lights.begin() + curLightIndex);
-        if (curLightIndex >= lights.size()) {
-            curLightIndex = lights.size() - 1;
+        // Button for clearing Camera
+        if (ImGui::Button("Reset Cameras")) {
+            //resetObjList(cameras,defaultLight);
         }
     }
 
-    // Button for clearing lights
-    if (ImGui::Button("Reset Lights")) {
-        //resetObjList(lights,defaultLight);
+    ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Lights")) {
+        ImGui::Text("Lights");
+        ImGui::Checkbox("MultiLightShading", &multiLightShadingEnabled);
+
+        itemStrings.clear();
+        itemCStrings.clear();
+        tempSelectedItem = static_cast<int>(curLightIndex);
+
+        for (size_t i = 0; i < lights.size(); i++) {
+            auto string = "Light " + std::to_string(i);
+            itemStrings.push_back(string);
+        }
+
+        for (const auto& string : itemStrings) {
+            itemCStrings.push_back(string.c_str());
+        }
+
+        if (ImGui::ListBox("Lights", &tempSelectedItem, itemCStrings.data(), (int)itemCStrings.size(), 4)) {
+            curLightIndex = static_cast<size_t>(tempSelectedItem);
+        }
+
+        selectedLight = &lights[curLightIndex];
+        ImGui::Text("Selected Light Index: %d", curLightIndex);
+
+        ImGui::ColorEdit3("Light Color", &selectedLight->color[0]);
+
+        ImGui::InputFloat3("Position", &selectedLight->position[0]);
+
+        if (ImGui::Button("Add Lights")) {
+            lights.push_back(Light{ glm::vec3(1, 3, -2), glm::vec3(1), -glm::vec3(0, 0, 3), false, false, /*std::nullopt*/ });
+        }
+
+        if (ImGui::Button("Remove Lights")) {
+            lights.erase(lights.begin() + curLightIndex);
+            if (curLightIndex >= lights.size()) {
+                curLightIndex = lights.size() - 1;
+            }
+        }
+
+        // Button for clearing lights
+        if (ImGui::Button("Reset Lights")) {
+            //resetObjList(lights,defaultLight);
+        }
+    }
+
+    ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Enable Alternative rendering process")) {
+        ImGui::Checkbox("Switch to Deferred Rendering Pipeline", &ssaoEnabled);
+        ImGui::Checkbox("usePostProcess", &usePostProcess);
     }
 
     ImGui::End();
