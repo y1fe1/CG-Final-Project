@@ -948,7 +948,6 @@ void Application::imgui() {
         ImGui::SliderFloat("Ambient Occlusion", &m_PbrMaterial.ao, 0.0f, 1.0f);
 
         this->usePbrShading = true;
-        this->multiLightShadingEnabled = true;
 
         ImGui::Separator();
         ImGui::Text("PBR Texture parameters");
@@ -1302,11 +1301,16 @@ void Application::runPostProcess() {
  * Initializes some PBR textures.
  */
 void Application::initPBRTexures() {
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/normal.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/albedo.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/metallic.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/roughness.png")));
-    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/ao.png")));
+    // m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/normal.png")));
+    // m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/albedo.png")));
+    // m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/metallic.png")));
+    // m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/roughness.png")));
+    // m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/gold_scuffed/ao.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/normal.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/albedo.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/metallic.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/roughness.png")));
+    m_pbrTextures.emplace_back(std::move(Texture(RESOURCE_ROOT "resources/texture/rusted_iron_pbr/ao.png")));
 }
 
 /**
@@ -1529,12 +1533,14 @@ void Application::renderSolarSystem() {
                 glUniform1i(m_selShader->getUniformLocation("useNormalMapping"), GL_FALSE);
             }
 
+            sun_light.position  = (i == 0) ? glm::vec3(0.0f) : glm::vec3(translate(inverse(newMatrix), -1.0f * newPos)[3]);
+            sun_light.color     = body.kd();
+            
             if (usePbrShading) {
+                genUboBufferObj(sun_light, lightUBO); // Pass single Light
                 mesh.drawPBR(*m_selShader, PbrUBO, lightUBO);
             }
             else {
-                sun_light.position  = (i == 0) ? glm::vec3(0.0f) : glm::vec3(translate(inverse(newMatrix), -1.0f * newPos)[3]);
-                sun_light.color     = body.kd();
                 genUboBufferObj(sun_light, lightUBO); // Pass single Light
                 mesh.draw(*m_selShader, lightUBO, false);
             }

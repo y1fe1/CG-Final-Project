@@ -77,8 +77,6 @@ public:
         body.orbitRadius = 12.5f;
         body.radius = 3.0f;
         body.stationary = true;
-        body.speed = 0.005f;
-        body.rotateAroundAxis = true;
         return body;
     }
 
