@@ -23,15 +23,16 @@ public:
     glm::mat4 viewMatrix() const;
     bool m_useBezier{ false };
     bool m_bezierConstantSpeed{ false };
+    bool useLockView{ false };
 
     //Bezier params
-    glm::vec3 P0 = { 1.0f, 0.0f, 0.0f };
-    glm::vec3 P1 = { 0.0f, 1.0f, 1.0f };
-    glm::vec3 P2 = { 1.0f, 1.0f, 0.5f };
-    glm::vec3 P3 = { 0.0f, 0.0f, 0.0f };
+    glm::vec3 P0 = { 0.0f, 4.0f, 0.0f };
+    glm::vec3 P1 = { 0.0f, 6.0f, -8.0f };
+    glm::vec3 P2 = { 5.0f, 7.0f, -15.0f };
+    glm::vec3 P3 = { 0.0f, 4.0f, 0.0f };
     
 
-    float bezierTimeStep = 0.001;
+    float bezierTimeStep = 0.001f;
     int bezierConstantSpeedSampleNumber = 1000;
     int bezierSpeed = 1;
 
@@ -56,10 +57,10 @@ private:
     glm::dvec2 m_prevCursorPos{ 0 };
 
     //Constant params
-    glm::vec3 oldP0 = { 1.0f, 0.0f, 0.0f };
-    glm::vec3 oldP1 = { 0.0f, 1.0f, 1.0f };
-    glm::vec3 oldP2 = { 1.0f, 1.0f, 0.5f };
-    glm::vec3 oldP3 = { 0.0f, 0.0f, 0.0f };
+    glm::vec3 oldP0 = { 0.0f, 4.0f, 0.0f };
+    glm::vec3 oldP1 = { 0.0f, 6.0f, -8.0f };
+    glm::vec3 oldP2 = { 5.0f, 7.0f, -15.0f };
+    glm::vec3 oldP3 = { 0.0f, 4.0f, 0.0f };
     int oldBezierConstantSpeedSampleNumber = 1000;
     bool isChangedPoints = { true };
     void checkChange();

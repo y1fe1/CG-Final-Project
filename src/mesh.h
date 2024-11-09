@@ -1,5 +1,7 @@
 #pragma once
 
+#include "protocol.h"
+
 #include <framework/disable_all_warnings.h>
 #include <framework/mesh.h>
 #include <framework/shader.h>
@@ -37,6 +39,8 @@ public:
     // Multiple meshes may be generated if there are multiple sub-meshes in the file
     static std::vector<GPUMesh> loadMeshGPU(std::filesystem::path filePath, bool normalize = false);
 
+    static std::vector<GPUMesh> loadMeshGPU(std::vector<Mesh> cpuMeshs);
+
     // Cannot copy a GPU mesh because it would require reference counting of GPU resources.
     GPUMesh& operator=(const GPUMesh&) = delete;
     GPUMesh& operator=(GPUMesh&&);
@@ -44,7 +48,8 @@ public:
     bool hasTextureCoords() const;
 
     // Define new Getter here
-    GLuint getVao();
+    GLuint& getVao();
+    GLuint& getShadowVao();
 
     // Define new Setter here
     void setUBOMaterial(GLuint newUboMaterial);
@@ -53,13 +58,18 @@ public:
     // Bind VAO and call glDrawElements.
     void draw(const Shader& drawingShader);
 
-    void draw(const Shader& drawingShader, GLuint drawingUBO);
+    void draw(const Shader& drawingShader, GLuint& drawingUBO, bool multiLightShadingEnabled);
+    void drawPBR(const Shader& drawingShader, GLuint& PbrUbo, GLuint& drawingUBO);
 
     void drawBasic(const Shader& drawingShader);
+
+    void drawShadowMap(const Shader& shadowShader, glm::mat4 lightMVP, GLuint& texShadowBuffer, const int SHADOWTEX_WIDTH, const int SHADOWTEX_HEIGHT);
 
 private:
     void moveInto(GPUMesh&&);
     void freeGpuMemory();
+
+    void initializeShadowVAO();
 
 private:
     static constexpr GLuint INVALID = 0xFFFFFFFF;
@@ -70,4 +80,6 @@ private:
     GLuint m_vbo { INVALID };
     GLuint m_vao { INVALID };
     GLuint m_uboMaterial { INVALID };
+
+    GLuint m_shadowVao{ INVALID }; // Create Separate VAO for shadowMapping
 };

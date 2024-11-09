@@ -47,6 +47,7 @@ GPUMesh::GPUMesh(const Mesh& cpuMesh)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
+
     // Reuse all attributes for each instance
     glVertexAttribDivisor(0, 0);
     glVertexAttribDivisor(1, 0);
@@ -54,6 +55,11 @@ GPUMesh::GPUMesh(const Mesh& cpuMesh)
 
     // Each triangle has 3 vertices.
     m_numIndices = static_cast<GLsizei>(3 * cpuMesh.triangles.size());
+
+    glBindVertexArray(0);
+
+    // Set up shadow Vao
+    initializeShadowVAO();
 }
 
 GPUMesh::GPUMesh(GPUMesh&& other)
@@ -87,13 +93,29 @@ std::vector<GPUMesh> GPUMesh::loadMeshGPU(std::filesystem::path filePath, bool n
     return gpuMeshes;
 }
 
+std::vector<GPUMesh> GPUMesh::loadMeshGPU(std::vector<Mesh> cpuMeshs) {
+
+    std::vector<GPUMesh> gpuMeshes;
+
+    for (const Mesh& mesh : cpuMeshs) {
+        gpuMeshes.emplace_back(mesh);
+    }
+
+    return gpuMeshes;
+}
+
 bool GPUMesh::hasTextureCoords() const
 {
     return m_hasTextureCoords;
 }
 
-GLuint GPUMesh::getVao(){
+GLuint& GPUMesh::getVao(){
     return m_vao;
+}
+
+GLuint& GPUMesh::getShadowVao()
+{
+    return m_shadowVao;
 }
 
 void GPUMesh::setUBOMaterial(GLuint newUboMaterial)
@@ -111,19 +133,62 @@ void GPUMesh::draw(const Shader& drawingShader)
 
     // Draw the mesh's triangles
     glBindVertexArray(m_vao);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
+
     glBindVertexArray(0);
 }
 
-void GPUMesh::draw(const Shader& drawingShader, GLuint drawingUBO)
+void GPUMesh::draw(const Shader& drawingShader, GLuint& drawingUBO, bool multiLightShadingEnabled = false)
 {
     // Bind material data uniform
     drawingShader.bindUniformBlock("Material", 0, m_uboMaterial);
-    drawingShader.bindUniformBlock("Light", 1, drawingUBO);
+
+    if (!multiLightShadingEnabled) {
+        drawingShader.bindUniformBlock("Light", 1, drawingUBO);
+    }
+    else {
+        drawingShader.bindUniformBlock("lights", 1, drawingUBO);
+    }
 
     // Draw the mesh's triangles
     glBindVertexArray(m_vao);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
+
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
+    
+    //GLint viewport[4];
+    //glGetIntegerv(GL_VIEWPORT, viewport);
+    //std::cout << "Current viewport: x = " << viewport[0] << ", y = " << viewport[1]
+    //    << ", width = " << viewport[2] << ", height = " << viewport[3] << std::endl;
+
+
+    GLenum err;
+    while ((err = glGetError()) != GL_NO_ERROR) {
+        std::cerr << "OpenGL Error: " << err << std::endl;
+    }
+
+
+    glBindVertexArray(0);
+}
+
+void GPUMesh::drawPBR(const Shader& drawingShader, GLuint& PbrUbo, GLuint& drawingUBO)
+{
+    // Bind material data uniform
+    drawingShader.bindUniformBlock("PBR_Material", 0, PbrUbo);
+    drawingShader.bindUniformBlock("lights", 1, drawingUBO);
+
+    // Draw the mesh's triangles
+    glBindVertexArray(m_vao);
+
+    glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
+
     glBindVertexArray(0);
 }
 
@@ -131,8 +196,41 @@ void GPUMesh::drawBasic(const Shader& drawingShader)
 {
     // Draw the mesh's triangles
     glBindVertexArray(m_vao);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
+
     glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
+
     glBindVertexArray(0);
+}
+
+void GPUMesh::drawShadowMap(const Shader& shadowShader, glm::mat4 lightMVP, GLuint& texShadowBuffer, const int SHADOWTEX_WIDTH, const int SHADOWTEX_HEIGHT)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, texShadowBuffer);
+
+    // Clear the shadow map and set needed options
+    glClearDepth(1.0);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+
+    shadowShader.bind();
+    // Set viewport size
+    glViewport(0, 0, SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
+
+    glUniformMatrix4fv(shadowShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(lightMVP));
+
+    // Bind vertex data
+    glBindVertexArray(m_vao);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
+
+    // Execute draw command
+    glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
+
+    // Unbind the off-screen framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void GPUMesh::moveInto(GPUMesh&& other)
@@ -163,4 +261,21 @@ void GPUMesh::freeGpuMemory()
         glDeleteBuffers(1, &m_ibo);
     if (m_uboMaterial != INVALID)
         glDeleteBuffers(1, &m_uboMaterial);
+}
+
+void GPUMesh::initializeShadowVAO()
+{
+    glGenVertexArrays(1, &m_shadowVao);
+    glBindVertexArray(m_shadowVao);
+
+    // Bind VBO and IBO
+    glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ibo);
+
+    // Set vertex attribute for shadow mapping (e.g., only position)
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
+
+    // Unbind VAO
+    glBindVertexArray(0);
 }

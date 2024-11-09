@@ -1,0 +1,2 @@
+Assignment filter=lfs diff=lfs merge=lfs -text
+2/resources/texture/HDR/Free_Galaxies_8k.hdr filter=lfs diff=lfs merge=lfs -text
