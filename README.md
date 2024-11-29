@@ -1,6 +1,6 @@
 # 3DCGA Final Project
 
-This is the Final Real-Time Demo I build using OpenGL and C++ with groupmates
+This is the Final Real-Time Demo I build using OpenGL and C++ with groupmates in TU Delft
 
 ## 1. Implemented Features
 
